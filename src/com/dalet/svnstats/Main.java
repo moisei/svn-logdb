@@ -1,5 +1,7 @@
 package com.dalet.svnstats;
 
+import org.tmatesoft.svn.core.io.SVNRepository;
+
 /**
  * User: Moisei Rabinovich
  * Date: 2/12/14
@@ -7,8 +9,11 @@ package com.dalet.svnstats;
  */
 public class Main {
     public static void main(String[] args) throws Exception {
-        SvnLogDbBuilder logDbBuilder = new SvnLogDbBuilder("svn://gfn-svn:3692/branches");
-        logDbBuilder.svnlog2db(150000, 150100);
+        SvnLogDbBuilder logDbBuilder = new SvnLogDbBuilder("svn://gfn-svn:3692");
+        logDbBuilder.svnlog2db(82994, SVNRepository.INVALID_REVISION);
+//        logDbBuilder.svnlog2db(152000, SVNRepository.INVALID_REVISION);
+//        logDbBuilder.svnlog2db(126991, SVNRepository.INVALID_REVISION);
+//        logDbBuilder.svnlog2db(82994, 126990);
         logDbBuilder.close();
     }
 

@@ -19,8 +19,8 @@ import java.util.Properties;
  */
 public class SvnLogDbBuilder {
 
-    private static final int MAX_MSG_LENGTH = 1024 * 8;
-    private static final int MAX_PATH_LENGTH = 2048;
+    public static final int MAX_MSG_LENGTH = 1024 * 8;
+    public static final int MAX_PATH_LENGTH = 2048;
     private SVNRepository svnRepository;
     private Connection sqlConnection;
 
@@ -55,7 +55,7 @@ public class SvnLogDbBuilder {
         executeStatementIgnoreExisiting("CREATE TABLE ISSUES(Revision BIGINT, Type VARCHAR(10), Reference VARCHAR(100), NotesClientUrl VARCHAR(1024), NotesWebUrl VARCHAR(1024))");
     }
 
-    void svnlog2db(int startRevision, int endRevision) throws SVNException, SQLException {
+    void svnlog2db(long startRevision, long endRevision) throws SVNException, SQLException {
         try (SvnLogEntryHandler svnLogEntryHandler = new SvnLogEntryHandler(sqlConnection)) {
             svnRepository.log(new String[]{"/"}, startRevision, endRevision, true, false, svnLogEntryHandler);
             sqlConnection.commit();

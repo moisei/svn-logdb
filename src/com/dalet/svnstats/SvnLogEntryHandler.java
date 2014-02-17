@@ -108,7 +108,8 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
     }
 
     private void fillCommits(SVNLogEntry svnLogEntry) throws SQLException {
-        insertCommitsStatement.addrow(svnLogEntry.getRevision(), new Date(svnLogEntry.getDate().getTime()), svnLogEntry.getAuthor(), svnLogEntry.getMessage());
+        String msg = (svnLogEntry.getMessage().length() < SvnLogDbBuilder.MAX_MSG_LENGTH) ? svnLogEntry.getMessage() : svnLogEntry.getMessage().substring(0, SvnLogDbBuilder.MAX_MSG_LENGTH);
+        insertCommitsStatement.addrow(svnLogEntry.getRevision(), new Date(svnLogEntry.getDate().getTime()), svnLogEntry.getAuthor(), msg);
     }
 
     private void fillChangedFiles(SVNLogEntry svnLogEntry) throws SQLException {
