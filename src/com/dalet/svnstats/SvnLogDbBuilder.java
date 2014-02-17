@@ -3,15 +3,13 @@ package com.dalet.svnstats;
 import org.tmatesoft.svn.core.*;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
-import org.tmatesoft.svn.core.internal.wc.DefaultSVNOptions;
 import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
-import org.tmatesoft.svn.core.wc.SVNDiffClient;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.sql.*;
 import java.util.Map;
 import java.util.Properties;
@@ -27,8 +25,6 @@ public class SvnLogDbBuilder {
     private static final int MAX_PATH_LENGTH = 2048;
     private SVNRepository svnRepository;
     private Connection hsqlConnection;
-    private SVNDiffClient svnDiffClient;
-    private SVNURL svnUrl;
 
     public SvnLogDbBuilder(String svnUrl) throws ClassNotFoundException, IllegalAccessException, InstantiationException, SVNException, SQLException, IOException {
         initHsqldb();
@@ -37,12 +33,10 @@ public class SvnLogDbBuilder {
 
     private void initSvn(String url) throws SVNException {
         DAVRepositoryFactory.setup();
-        this.svnUrl = SVNURL.parseURIEncoded(url);
+        SVNURL svnUrl = SVNURL.parseURIEncoded(url);
         svnRepository = SVNRepositoryFactory.create(svnUrl);
         ISVNAuthenticationManager authManager = SVNWCUtil.createDefaultAuthenticationManager("svc", "gfn");
         svnRepository.setAuthenticationManager(authManager);
-        svnDiffClient = new SVNDiffClient(authManager, new DefaultSVNOptions());
-
     }
 
     private void initHsqldb() throws InstantiationException, IllegalAccessException, ClassNotFoundException, SQLException, IOException {
@@ -61,28 +55,11 @@ public class SvnLogDbBuilder {
     }
 
     void svnlog2db(int startRevision, int endRevision) throws SVNException, SQLException {
-        try (PreparedStatement insertCommitsStatement = hsqlConnection.prepareStatement("INSERT INTO COMMITS VALUES(?, ?, ?, ?)")) {
-            try (PreparedStatement insertFilesStatement = hsqlConnection.prepareStatement("INSERT INTO FILES VALUES(?, ?, ?, ?)")) {
-                svnRepository.log(new String[]{"/"}, startRevision, endRevision, true, false, new SvnLogHandler(insertCommitsStatement, insertFilesStatement));
-                hsqlConnection.commit();
-            }
+        try (SvnLogHandler svnLogHandler = new SvnLogHandler()) {
+            svnRepository.log(new String[]{"/"}, startRevision, endRevision, true, false, svnLogHandler);
+            hsqlConnection.commit();
         }
-        try (Statement statement = hsqlConnection.createStatement()) {
-            statement.execute("SELECT COUNT(1) FROM  COMMITS");
-            try (ResultSet resultSet = statement.getResultSet()) {
-                resultSet.next();
-                System.out.println("Number of rows in COMMIITS table is: " + resultSet.getLong(1));
-            }
-        }
-    }
-
-    private void handleLogEntry(SVNLogEntry logEntry, PreparedStatement insertCommitStatement, PreparedStatement insertFilesStatement) throws SQLException {
-        long revision = logEntry.getRevision();
-        System.out.println("Handling revision: " + revision);
-        fillCommit(logEntry, insertCommitStatement);
-        fillChangedFiles(logEntry, insertFilesStatement);
-        OutputStream outStream = System.out;
-//        svnDiffClient.doDiff(svnUrl, SVNRevision.create(revision-1), SVNRevision.create(revision), SVNDepth.INFINITY, false, outStream);
+        printReport();
     }
 
     private void fillChangedFiles(SVNLogEntry logEntry, PreparedStatement insertFilesStatement) throws SQLException {
@@ -116,7 +93,6 @@ public class SvnLogDbBuilder {
         }
         try {
             DriverManager.getConnection("jdbc:Hsql:;shutdown=true");
-
         } catch (Exception ignore) {
         }
     }
@@ -139,21 +115,50 @@ public class SvnLogDbBuilder {
         }
     }
 
-    private class SvnLogHandler implements ISVNLogEntryHandler {
-        private final PreparedStatement insertStatement;
-        private PreparedStatement insertFilesStatement;
+    private void printReport() throws SQLException {
+        try (Statement statement = hsqlConnection.createStatement()) {
+            statement.execute("SELECT COUNT(1) FROM  COMMITS");
+            try (ResultSet resultSet = statement.getResultSet()) {
+                resultSet.next();
+                System.out.println("Number of rows in COMMIITS table is: " + resultSet.getLong(1));
+            }
+        }
+    }
 
-        public SvnLogHandler(PreparedStatement insertStatement, PreparedStatement insertFilesStatement) {
-            this.insertStatement = insertStatement;
-            this.insertFilesStatement = insertFilesStatement;
+    private class SvnLogHandler implements ISVNLogEntryHandler, Closeable {
+        private final PreparedStatement insertCommitsStatement;
+        private final PreparedStatement insertFilesStatement;
+
+        public SvnLogHandler() throws SQLException {
+            insertCommitsStatement = hsqlConnection.prepareStatement("INSERT INTO COMMITS VALUES(?, ?, ?, ?)");
+            insertFilesStatement = hsqlConnection.prepareStatement("INSERT INTO FILES VALUES(?, ?, ?, ?)");
         }
 
         @Override
         public void handleLogEntry(SVNLogEntry svnLogEntry) throws SVNException {
             try {
-                SvnLogDbBuilder.this.handleLogEntry(svnLogEntry, insertStatement, insertFilesStatement);
+                handleLogEntryUnsafe(svnLogEntry);
             } catch (SQLException e) {
                 throw new SVNException(SVNErrorMessage.create(SVNErrorCode.UNKNOWN, e.getMessage()), e);
+            }
+        }
+
+        private void handleLogEntryUnsafe(SVNLogEntry logEntry) throws SQLException {
+            long revision = logEntry.getRevision();
+            System.out.println("Handling revision: " + revision);
+            fillCommit(logEntry, insertCommitsStatement);
+            fillChangedFiles(logEntry, insertFilesStatement);
+        }
+
+        @Override
+        public void close() {
+            try {
+                insertCommitsStatement.close();
+            } catch (SQLException ignore) {
+            }
+            try {
+                insertFilesStatement.close();
+            } catch (SQLException ignore) {
             }
         }
     }
