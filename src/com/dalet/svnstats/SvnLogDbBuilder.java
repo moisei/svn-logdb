@@ -11,6 +11,8 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -24,7 +26,7 @@ public class SvnLogDbBuilder {
     private static final int MAX_MSG_LENGTH = 1024 * 8;
     private static final int MAX_PATH_LENGTH = 2048;
     private SVNRepository svnRepository;
-    private Connection hsqlConnection;
+    private Connection sqlConnection;
 
     public SvnLogDbBuilder(String svnUrl) throws ClassNotFoundException, IllegalAccessException, InstantiationException, SVNException, SQLException, IOException {
         initHsqldb();
@@ -48,38 +50,21 @@ public class SvnLogDbBuilder {
         props.put("jdbc.get_column_name", "false");
         String url = "jdbc:hsqldb:" + new File(".svnlogDB/db").getCanonicalPath();
         System.out.println(url);
-        hsqlConnection = DriverManager.getConnection(url, props);
-        hsqlConnection.setAutoCommit(false);
-        executeStatementNoException("CREATE TABLE COMMITS(Revision BIGINT, Date date, Author varchar(100), Message varchar(" + MAX_MSG_LENGTH + "))");
-        executeStatementNoException("CREATE TABLE FILES(Revision BIGINT, Type varchar(10), Kind varchar(10), File varchar(" + MAX_PATH_LENGTH + "))");
+        sqlConnection = DriverManager.getConnection(url, props);
+        sqlConnection.setAutoCommit(false);
+        executeStatementIgnoreExisiting("CREATE TABLE COMMITS(Revision BIGINT, Date DATE, Author VARCHAR(100), Message VARCHAR(" + MAX_MSG_LENGTH + "))");
+        executeStatementIgnoreExisiting("CREATE TABLE FILES(Revision BIGINT, Type VARCHAR(10), Kind VARCHAR(10), File VARCHAR(" + MAX_PATH_LENGTH + "))");
+//        executeStatementIgnoreExisiting("CREATE TABLE DATE_TIME(Revision BIGINT, Date date, Year int(5), Month int(2), Day int(2), Week int(2)), Hour int(2), Min int(2), Sec int(2)");
+//        executeStatementIgnoreExisiting("CREATE TABLE ISSUES(Revision BIGINT, Type VARCHAR(10), Reference VARCHAR(100), NotesClientUrl VARCHAR(1024), NotesWebUrl VARCHAR(1024)");
+//        executeStatementIgnoreExisiting("CREATE TABLE VERSION(Revision BIGINT, Type VARCHAR(10), Branch VARCHAR(1024), ProductVersion VARCHAR(100), FullVersion VARCHAR(100)");
     }
 
     void svnlog2db(int startRevision, int endRevision) throws SVNException, SQLException {
         try (SvnLogHandler svnLogHandler = new SvnLogHandler()) {
             svnRepository.log(new String[]{"/"}, startRevision, endRevision, true, false, svnLogHandler);
-            hsqlConnection.commit();
+            sqlConnection.commit();
         }
         printReport();
-    }
-
-    private void fillChangedFiles(SVNLogEntry logEntry, PreparedStatement insertFilesStatement) throws SQLException {
-        Map<String, SVNLogEntryPath> changedPaths = logEntry.getChangedPaths();
-        for (String path : changedPaths.keySet()) {
-            SVNLogEntryPath change = changedPaths.get(path);
-            insertFilesStatement.setLong(1, logEntry.getRevision());
-            insertFilesStatement.setString(2, String.valueOf(change.getType()));
-            insertFilesStatement.setString(3, change.getKind().toString());
-            insertFilesStatement.setString(4, change.getPath());
-            insertFilesStatement.execute();
-        }
-    }
-
-    private void fillCommit(SVNLogEntry svnLogEntry, PreparedStatement insertCommitStatement) throws SQLException {
-        insertCommitStatement.setLong(1, svnLogEntry.getRevision());
-        insertCommitStatement.setDate(2, new Date(svnLogEntry.getDate().getTime()));
-        insertCommitStatement.setString(3, svnLogEntry.getAuthor());
-        insertCommitStatement.setString(4, svnLogEntry.getMessage());
-        insertCommitStatement.execute();
     }
 
     public void close() {
@@ -88,7 +73,7 @@ public class SvnLogDbBuilder {
         } catch (Exception ignore) {
         }
         try {
-            hsqlConnection.close();
+            sqlConnection.close();
         } catch (Exception ignore) {
         }
         try {
@@ -97,27 +82,29 @@ public class SvnLogDbBuilder {
         }
     }
 
-    private void executeStatementNoException(String sql) {
+    private void executeStatementIgnoreExisiting(String sql) throws SQLException {
         try {
             executeStatement(sql);
-        } catch (SQLException ignore) {
-            System.out.println(ignore.getMessage());
-            // table already exists
+        } catch (SQLException e) {
+            if (! e.getMessage().startsWith("object name already exists")) {
+                  throw e;
+            }
+            System.out.println("executeStatementIgnoreExisiting: " + e.getMessage());
         }
     }
 
     private void executeStatement(String sql) throws SQLException {
-        try (Statement statement = hsqlConnection.createStatement()) {
+        try (Statement statement = sqlConnection.createStatement()) {
             statement.execute(sql);
-            if (!hsqlConnection.getAutoCommit()) {
-                hsqlConnection.commit();
+            if (!sqlConnection.getAutoCommit()) {
+                sqlConnection.commit();
             }
         }
     }
 
     private void printReport() throws SQLException {
-        try (Statement statement = hsqlConnection.createStatement()) {
-            statement.execute("SELECT COUNT(1) FROM  COMMITS");
+        try (Statement statement = sqlConnection.createStatement()) {
+            statement.execute("SELECT COUNT(1) FROM COMMITS");
             try (ResultSet resultSet = statement.getResultSet()) {
                 resultSet.next();
                 System.out.println("Number of rows in COMMIITS table is: " + resultSet.getLong(1));
@@ -126,12 +113,12 @@ public class SvnLogDbBuilder {
     }
 
     private class SvnLogHandler implements ISVNLogEntryHandler, Closeable {
-        private final PreparedStatement insertCommitsStatement;
-        private final PreparedStatement insertFilesStatement;
+        private final InsertStatement insertCommitsStatement;
+        private final InsertStatement insertFilesStatement;
 
         public SvnLogHandler() throws SQLException {
-            insertCommitsStatement = hsqlConnection.prepareStatement("INSERT INTO COMMITS VALUES(?, ?, ?, ?)");
-            insertFilesStatement = hsqlConnection.prepareStatement("INSERT INTO FILES VALUES(?, ?, ?, ?)");
+            insertCommitsStatement = new InsertStatement("COMMITS", sqlConnection);
+            insertFilesStatement = new InsertStatement("FILES", sqlConnection);
         }
 
         @Override
@@ -144,20 +131,73 @@ public class SvnLogDbBuilder {
         }
 
         private void handleLogEntryUnsafe(SVNLogEntry logEntry) throws SQLException {
-            long revision = logEntry.getRevision();
-            System.out.println("Handling revision: " + revision);
-            fillCommit(logEntry, insertCommitsStatement);
-            fillChangedFiles(logEntry, insertFilesStatement);
+            System.out.println("Handling revision: " + logEntry.getRevision());
+            fillCommits(logEntry);
+            fillChangedFiles(logEntry);
+        }
+
+        private void fillCommits(SVNLogEntry logEntry) throws SQLException {
+            insertCommitsStatement.addrow(logEntry.getRevision(), new Date(logEntry.getDate().getTime()), logEntry.getAuthor(), logEntry.getMessage());
+        }
+
+        private void fillChangedFiles(SVNLogEntry logEntry) throws SQLException {
+            Map<String, SVNLogEntryPath> changedPaths = logEntry.getChangedPaths();
+            for (String path : changedPaths.keySet()) {
+                SVNLogEntryPath change = changedPaths.get(path);
+                insertFilesStatement.addrow(logEntry.getRevision(), String.valueOf(change.getType()), change.getKind().toString(), change.getPath());
+            }
+        }
+
+        @Override
+        public void close() {
+            insertCommitsStatement.close();
+            insertFilesStatement.close();
+        }
+    }
+
+    private class InsertStatement implements Closeable {
+        private final PreparedStatement statement;
+        private final List<String> types;
+
+        public InsertStatement(String table, Connection sqlConnection) throws SQLException {
+            DatabaseMetaData meta = sqlConnection.getMetaData();
+            ResultSet rsColumns = meta.getColumns(null, null, table, null);
+            types = new ArrayList<>();
+            while (rsColumns.next()) {
+                types.add(rsColumns.getString("TYPE_NAME").toUpperCase());
+            }
+            String sql = String.format(String.format("%%0%dd", types.size()), 0).replace("0", "?, ");
+            sql = sql.substring(0, sql.length() - 2);
+            sql = "INSERT INTO " + table + " VALUES(" + sql + ")";
+            statement = sqlConnection.prepareStatement(sql);
+        }
+
+        public void addrow(Object... parameters) throws SQLException {
+            for (int i = 0; i < parameters.length; ++i) {
+                String typeName = types.get(i);
+                Object parameter = parameters[i];
+                int idx = i + 1;
+                switch (typeName) {
+                    case "BIGINT":
+                        statement.setLong(idx, (Long) parameter);
+                        break;
+                    case "VARCHAR":
+                        statement.setString(idx, (String) parameter);
+                        break;
+                    case "DATE":
+                        statement.setDate(idx, (Date) parameter);
+                        break;
+                    default:
+                        throw new RuntimeException("Unknown column type: " + typeName);
+                }
+            }
+            statement.executeUpdate();
         }
 
         @Override
         public void close() {
             try {
-                insertCommitsStatement.close();
-            } catch (SQLException ignore) {
-            }
-            try {
-                insertFilesStatement.close();
+                statement.close();
             } catch (SQLException ignore) {
             }
         }
