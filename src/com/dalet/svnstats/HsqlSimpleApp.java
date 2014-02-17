@@ -76,6 +76,7 @@ public class HsqlSimpleApp {
             props.put("user", user);
             props.put("password", password);
             props.put("jdbc.strict_md", "false");
+            props.put("shutdown", "true");
             props.put("jdbc.get_column_name", getColumnName);
 
 
