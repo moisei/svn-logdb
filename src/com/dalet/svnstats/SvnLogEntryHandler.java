@@ -16,11 +16,13 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
     private final InsertStatement insertCommitsStatement;
     private final InsertStatement insertFilesStatement;
     private final InsertStatement insertDateTimeStatement;
+    private final SvnLogEntryHandler.InsertStatement insertVersionStatement;
 
     public SvnLogEntryHandler(Connection sqlConnection) throws SQLException {
         insertCommitsStatement = new InsertStatement("COMMITS", sqlConnection);
         insertFilesStatement = new InsertStatement("FILES", sqlConnection);
         insertDateTimeStatement = new InsertStatement("DATE_TIME", sqlConnection);
+        insertVersionStatement = new InsertStatement("VERSION", sqlConnection);
     }
 
     @Override
@@ -29,17 +31,70 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
         try {
             fillCommits(svnLogEntry);
             fillChangedFiles(svnLogEntry);
-            fillDates(svnLogEntry);
+            fillDateTime(svnLogEntry);
+            fillVersion(svnLogEntry);
         } catch (SQLException e) {
             throw new SVNException(SVNErrorMessage.create(SVNErrorCode.UNKNOWN, e.getMessage()), e);
         }
     }
 
+    // VERSION(Revision BIGINT, Product VARCHAR(32), Type VARCHAR(10), Branch VARCHAR(1024), ProductVersion VARCHAR(100), FullVersion VARCHAR(100)
+    private void fillVersion(SVNLogEntry svnLogEntry) throws SQLException {
+        String type;
+        String branch;
+        String product;
+        String productVersion;
+        String fullVersion;
+        if (svnLogEntry.getChangedPaths().isEmpty()) {
+            product = "other";
+            type = "other";
+            branch = "other";
+            productVersion = "other";
+            fullVersion = "other";
+        } else {
+            SVNLogEntryPath firstPath = svnLogEntry.getChangedPaths().entrySet().iterator().next().getValue();
+            if (firstPath.getPath().startsWith("/branches/builds")) {
+                product = "Dalet";
+                type = "trunk";
+                branch = "builds";
+                productVersion = firstPath.getPath().split("/")[3];
+                fullVersion = productVersion;
+            } else if (firstPath.getPath().startsWith("/branches/tnt")) {
+                product = "Italy";
+                type = "trunk";
+                branch = "tnt";
+                productVersion = "other";
+                fullVersion = "other";
+            } else if (firstPath.getPath().startsWith("/branches/hotfixes")) {
+                product = "Dalet";
+                type = "hotfix";
+                branch = "hotfix";
+                productVersion = firstPath.getPath().split("/")[3];
+                fullVersion = productVersion;
+            } else {
+                product = "other";
+                type = "other";
+                branch = "other";
+                productVersion = "other";
+                fullVersion = "other";
+            }
+        }
+        insertVersionStatement.addrow(
+                svnLogEntry.getRevision(),
+                product,
+                type,
+                branch,
+                productVersion,
+                fullVersion,
+                svnLogEntry.getChangedPaths().size()
+        );
+    }
+
     // Revision BIGINT, Date DATE, Year INTEGER, Month INTEGER, Day INTEGER, Week INTEGER, DayOfWeek INTEGER, Hour INTEGER, Minutes INTEGER, Sec INTEGER;
-    private void fillDates(SVNLogEntry logEntry) throws SQLException {
+    private void fillDateTime(SVNLogEntry svnLogEntry) throws SQLException {
         Calendar cal = new GregorianCalendar();
-        cal.setTime(logEntry.getDate());
-        insertDateTimeStatement.addrow(logEntry.getRevision(),
+        cal.setTime(svnLogEntry.getDate());
+        insertDateTimeStatement.addrow(svnLogEntry.getRevision(),
                 cal.getTime(),
                 cal.get(Calendar.YEAR),
                 cal.get(Calendar.MONTH),
@@ -52,15 +107,15 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
         );
     }
 
-    private void fillCommits(SVNLogEntry logEntry) throws SQLException {
-        insertCommitsStatement.addrow(logEntry.getRevision(), new Date(logEntry.getDate().getTime()), logEntry.getAuthor(), logEntry.getMessage());
+    private void fillCommits(SVNLogEntry svnLogEntry) throws SQLException {
+        insertCommitsStatement.addrow(svnLogEntry.getRevision(), new Date(svnLogEntry.getDate().getTime()), svnLogEntry.getAuthor(), svnLogEntry.getMessage());
     }
 
-    private void fillChangedFiles(SVNLogEntry logEntry) throws SQLException {
-        Map<String, SVNLogEntryPath> changedPaths = logEntry.getChangedPaths();
+    private void fillChangedFiles(SVNLogEntry svnLogEntry) throws SQLException {
+        Map<String, SVNLogEntryPath> changedPaths = svnLogEntry.getChangedPaths();
         for (String path : changedPaths.keySet()) {
             SVNLogEntryPath change = changedPaths.get(path);
-            insertFilesStatement.addrow(logEntry.getRevision(), String.valueOf(change.getType()), change.getKind().toString(), change.getPath());
+            insertFilesStatement.addrow(svnLogEntry.getRevision(), String.valueOf(change.getType()), change.getKind().toString(), change.getPath());
         }
     }
 
@@ -68,6 +123,8 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
     public void close() {
         insertCommitsStatement.close();
         insertFilesStatement.close();
+        insertDateTimeStatement.close();
+        insertDateTimeStatement.close();
     }
 
     private class InsertStatement implements Closeable {
