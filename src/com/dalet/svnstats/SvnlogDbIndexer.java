@@ -58,7 +58,7 @@ public class SvnlogDbIndexer {
         executeStatementIgnoreExisiting("CREATE TABLE VERSION(Revision BIGINT, Product VARCHAR(32), Type VARCHAR(10), Branch VARCHAR(1024), ProductVersion VARCHAR(100), FullVersion VARCHAR(100))");
         executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  version_revision ON version (revision)");
         executeStatementIgnoreExisiting("CREATE TABLE ISSUES(Revision BIGINT, Type VARCHAR(10), Reference VARCHAR(100), NotesClientUrl VARCHAR(1024), NotesWebUrl VARCHAR(1024))");
-        executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  issues_revision ON issues (revision)");
+        executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  issues_revision_type_reference ON issues (revision, type, reference)");
     }
 
     void svnlog2db(long startRevision, long endRevision) throws SVNException, SQLException {

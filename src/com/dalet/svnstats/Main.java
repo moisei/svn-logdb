@@ -15,6 +15,7 @@ public class Main {
         String dbpath = "C:\\Sources\\DaletAddons\\Svn-Statistics\\.svnlogDB";
         File dbfile = new File(dbpath);
         Runtime.getRuntime().exec(new String[]{"cmd", "/k", "rmdir", "/s", "/q", dbfile.getCanonicalPath()});
+        Thread.sleep(1000);
         if (dbfile.exists()) {
             throw new IOException("Can't delete " + dbpath);
         }

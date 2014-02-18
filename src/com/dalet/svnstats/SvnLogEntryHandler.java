@@ -7,6 +7,9 @@ import java.sql.*;
 import java.sql.Date;
 import java.util.*;
 
+import static com.dalet.svnstats.LotusNotesMessageUtils.extractReferencedBugs;
+import static com.dalet.svnstats.LotusNotesMessageUtils.extractReferencedFeatures;
+
 /**
  * User: Moisei Rabinovich
  * Date: 2/17/14
@@ -17,12 +20,23 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
     private final InsertStatement insertFilesStatement;
     private final InsertStatement insertDateTimeStatement;
     private final SvnLogEntryHandler.InsertStatement insertVersionStatement;
+    private final InsertStatement insertIssuesStatement;
 
     public SvnLogEntryHandler(Connection sqlConnection) throws SQLException {
         insertCommitsStatement = new InsertStatement("COMMITS", sqlConnection);
         insertFilesStatement = new InsertStatement("FILES", sqlConnection);
         insertDateTimeStatement = new InsertStatement("DATE_TIME", sqlConnection);
         insertVersionStatement = new InsertStatement("VERSION", sqlConnection);
+        insertIssuesStatement = new InsertStatement("ISSUES", sqlConnection);
+    }
+
+    @Override
+    public void close() {
+        insertCommitsStatement.close();
+        insertFilesStatement.close();
+        insertDateTimeStatement.close();
+        insertDateTimeStatement.close();
+        insertIssuesStatement.close();
     }
 
     @Override
@@ -33,8 +47,20 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
             fillChangedFiles(svnLogEntry);
             fillDateTime(svnLogEntry);
             fillVersion(svnLogEntry);
+            fillIssues(svnLogEntry);
         } catch (SQLException e) {
             throw new SVNException(SVNErrorMessage.create(SVNErrorCode.UNKNOWN, e.getMessage()), e);
+        }
+    }
+
+    // Revision BIGINT, Type VARCHAR(10), Reference VARCHAR(100), NotesClientUrl VARCHAR(1024), NotesWebUrl VARCHAR(1024))
+    private void fillIssues(SVNLogEntry svnLogEntry) throws SQLException {
+        String message = svnLogEntry.getMessage();
+        for (String feature : extractReferencedFeatures(message)) {
+            insertIssuesStatement.addrow(svnLogEntry.getRevision(), "F", feature, "", "");
+        }
+        for (String bug : extractReferencedBugs(message)) {
+            insertIssuesStatement.addrow(svnLogEntry.getRevision(), "B", bug, "", "");
         }
     }
 
@@ -129,14 +155,6 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
             SVNLogEntryPath change = changedPaths.get(path);
             insertFilesStatement.addrow(svnLogEntry.getRevision(), String.valueOf(change.getType()), change.getKind().toString(), change.getPath());
         }
-    }
-
-    @Override
-    public void close() {
-        insertCommitsStatement.close();
-        insertFilesStatement.close();
-        insertDateTimeStatement.close();
-        insertDateTimeStatement.close();
     }
 
     private class InsertStatement implements Closeable {
