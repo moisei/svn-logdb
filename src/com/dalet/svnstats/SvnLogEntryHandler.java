@@ -40,43 +40,49 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
 
     // VERSION(Revision BIGINT, Product VARCHAR(32), Type VARCHAR(10), Branch VARCHAR(1024), ProductVersion VARCHAR(100), FullVersion VARCHAR(100)
     private void fillVersion(SVNLogEntry svnLogEntry) throws SQLException {
+        String product;
         String type;
         String branch;
-        String product;
-        String productVersion;
         String fullVersion;
+        String productVersion;
         if (svnLogEntry.getChangedPaths().isEmpty()) {
             product = "other";
             type = "other";
             branch = "other";
-            productVersion = "other";
             fullVersion = "other";
+            productVersion = "other";
         } else {
             SVNLogEntryPath firstPath = svnLogEntry.getChangedPaths().entrySet().iterator().next().getValue();
             if (firstPath.getPath().startsWith("/branches/builds")) {
                 product = "Dalet";
                 type = "trunk";
                 branch = "builds";
-                productVersion = firstPath.getPath().split("/")[3];
-                fullVersion = productVersion;
+                fullVersion = firstPath.getPath().split("/")[3];
+                productVersion = fullVersion;
             } else if (firstPath.getPath().startsWith("/branches/tnt")) {
                 product = "Italy";
                 type = "trunk";
                 branch = "tnt";
-                productVersion = "other";
                 fullVersion = "other";
+                productVersion = "other";
             } else if (firstPath.getPath().startsWith("/branches/hotfixes")) {
                 product = "Dalet";
                 type = "hotfix";
                 branch = "hotfix";
-                productVersion = firstPath.getPath().split("/")[3];
-                fullVersion = productVersion;
+                fullVersion = firstPath.getPath().split("/")[3];
+                String[] productVersionTokens = fullVersion.split("\\.");
+                if (productVersionTokens.length > 1) {
+                    productVersion = productVersionTokens[0] + "." + productVersionTokens[1];
+                } else {
+                    System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " fullVersion is too short: " + fullVersion + ": " + Arrays.toString(productVersionTokens));
+                    productVersion = fullVersion;
+                }
             } else {
                 product = "other";
                 type = "other";
                 branch = "other";
-                productVersion = "other";
                 fullVersion = "other";
+                productVersion = "other";
             }
         }
         insertVersionStatement.addrow(
@@ -85,8 +91,7 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
                 type,
                 branch,
                 productVersion,
-                fullVersion,
-                svnLogEntry.getChangedPaths().size()
+                fullVersion
         );
     }
 
@@ -108,8 +113,14 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
     }
 
     private void fillCommits(SVNLogEntry svnLogEntry) throws SQLException {
-        String msg = (svnLogEntry.getMessage().length() < SvnLogDbBuilder.MAX_MSG_LENGTH) ? svnLogEntry.getMessage() : svnLogEntry.getMessage().substring(0, SvnLogDbBuilder.MAX_MSG_LENGTH);
-        insertCommitsStatement.addrow(svnLogEntry.getRevision(), new Date(svnLogEntry.getDate().getTime()), svnLogEntry.getAuthor(), msg);
+        String msg;
+        if (svnLogEntry.getMessage().length() < SvnlogDbIndexer.MAX_MSG_LENGTH) {
+            msg = svnLogEntry.getMessage();
+        } else {
+            System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " message is too long: " + svnLogEntry.getMessage().length());
+            msg = svnLogEntry.getMessage().substring(0, SvnlogDbIndexer.MAX_MSG_LENGTH);
+        }
+        insertCommitsStatement.addrow(svnLogEntry.getRevision(), new Date(svnLogEntry.getDate().getTime()), svnLogEntry.getAuthor(), svnLogEntry.getChangedPaths().size(), msg);
     }
 
     private void fillChangedFiles(SVNLogEntry svnLogEntry) throws SQLException {

@@ -1,6 +1,7 @@
 package com.dalet.svnstats;
 
-import org.tmatesoft.svn.core.*;
+import org.tmatesoft.svn.core.SVNException;
+import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.auth.ISVNAuthenticationManager;
 import org.tmatesoft.svn.core.internal.io.dav.DAVRepositoryFactory;
 import org.tmatesoft.svn.core.io.SVNRepository;
@@ -17,14 +18,14 @@ import java.util.Properties;
  * Date: 2/16/14
  * Time: 4:43 PM
  */
-public class SvnLogDbBuilder {
+public class SvnlogDbIndexer {
 
     public static final int MAX_MSG_LENGTH = 1024 * 8;
     public static final int MAX_PATH_LENGTH = 2048;
     private SVNRepository svnRepository;
     private Connection sqlConnection;
 
-    public SvnLogDbBuilder(String svnUrl) throws ClassNotFoundException, IllegalAccessException, InstantiationException, SVNException, SQLException, IOException {
+    public SvnlogDbIndexer(String svnUrl) throws ClassNotFoundException, IllegalAccessException, InstantiationException, SVNException, SQLException, IOException {
         initHsqldb();
         initSvn(svnUrl);
     }
@@ -48,11 +49,16 @@ public class SvnLogDbBuilder {
         System.out.println(url);
         sqlConnection = DriverManager.getConnection(url, props);
         sqlConnection.setAutoCommit(false);
-        executeStatementIgnoreExisiting("CREATE TABLE COMMITS(Revision BIGINT, Date DATE, Author VARCHAR(100), Message VARCHAR(" + MAX_MSG_LENGTH + "))");
+        executeStatementIgnoreExisiting("CREATE TABLE COMMITS(Revision BIGINT, Date DATE, Author VARCHAR(100), ChangedFilesCount INTEGER, Message VARCHAR(" + MAX_MSG_LENGTH + "))");
+        executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  commits_revision ON commits (revision)");
         executeStatementIgnoreExisiting("CREATE TABLE FILES(Revision BIGINT, Type VARCHAR(10), Kind VARCHAR(10), File VARCHAR(" + MAX_PATH_LENGTH + "))");
+        executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  files_revision_file ON files (revision,file)");
         executeStatementIgnoreExisiting("CREATE TABLE DATE_TIME(Revision BIGINT, Date DATE, Year INTEGER, Month INTEGER, Day INTEGER, Week INTEGER, DayOfWeek INTEGER, Hour INTEGER, Minutes INTEGER, Sec INTEGER)");
-        executeStatementIgnoreExisiting("CREATE TABLE VERSION(Revision BIGINT, Product VARCHAR(32), Type VARCHAR(10), Branch VARCHAR(1024), ProductVersion VARCHAR(100), FullVersion VARCHAR(100), ChangedFiles INTEGER)");
+        executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  date_time_revision ON date_time (revision)");
+        executeStatementIgnoreExisiting("CREATE TABLE VERSION(Revision BIGINT, Product VARCHAR(32), Type VARCHAR(10), Branch VARCHAR(1024), ProductVersion VARCHAR(100), FullVersion VARCHAR(100))");
+        executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  version_revision ON version (revision)");
         executeStatementIgnoreExisiting("CREATE TABLE ISSUES(Revision BIGINT, Type VARCHAR(10), Reference VARCHAR(100), NotesClientUrl VARCHAR(1024), NotesWebUrl VARCHAR(1024))");
+        executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  issues_revision ON issues (revision)");
     }
 
     void svnlog2db(long startRevision, long endRevision) throws SVNException, SQLException {
@@ -82,7 +88,7 @@ public class SvnLogDbBuilder {
         try {
             executeStatement(sql);
         } catch (SQLException e) {
-            if (!e.getMessage().startsWith("object name already exists")) {
+            if (!e.getMessage().startsWith("object name already exists") && !e.getMessage().contains("unique constraint")) {
                 throw e;
             }
             System.out.println("executeStatementIgnoreExisiting: " + e.getMessage());
@@ -100,10 +106,14 @@ public class SvnLogDbBuilder {
 
     private void printReport() throws SQLException {
         try (Statement statement = sqlConnection.createStatement()) {
-            statement.execute("SELECT COUNT(1) FROM COMMITS");
+            statement.execute("SELECT COUNT(1) as lines_cnt, min(revision) as min_rev, max(revision) as max_rev, max(revision)-min(revision) as max_min FROM COMMITS");
             try (ResultSet resultSet = statement.getResultSet()) {
+                int columnCount = resultSet.getMetaData().getColumnCount();
                 resultSet.next();
-                System.out.println("Number of rows in COMMIITS table is: " + resultSet.getLong(1));
+                for (int i = 1; i < columnCount + 1; i++) {
+                    System.out.print(resultSet.getMetaData().getColumnName(i) + " " + resultSet.getInt(i) + ", ");
+                }
+                System.out.println();
             }
         }
     }
