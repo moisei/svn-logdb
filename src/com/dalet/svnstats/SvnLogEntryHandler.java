@@ -81,19 +81,19 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
             SVNLogEntryPath firstPath = svnLogEntry.getChangedPaths().entrySet().iterator().next().getValue();
             if (firstPath.getPath().startsWith("/branches/builds")) {
                 product = "Dalet";
-                type = "trunk";
+                type = "prod";
                 branch = "builds";
                 fullVersion = firstPath.getPath().split("/")[3];
                 productVersion = fullVersion;
             } else if (firstPath.getPath().startsWith("/branches/tnt")) {
                 product = "Italy";
-                type = "trunk";
+                type = "prod";
                 branch = "tnt";
                 fullVersion = "other";
                 productVersion = "other";
             } else if (firstPath.getPath().startsWith("/branches/hotfixes")) {
                 product = "Dalet";
-                type = "hotfix";
+                type = "prod";
                 branch = "hotfix";
                 fullVersion = firstPath.getPath().split("/")[3];
                 String[] productVersionTokens = fullVersion.split("\\.");
@@ -128,7 +128,7 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
         insertDateTimeStatement.addrow(svnLogEntry.getRevision(),
                 cal.getTime(),
                 cal.get(Calendar.YEAR),
-                cal.get(Calendar.MONTH),
+                1 + cal.get(Calendar.MONTH),
                 cal.get(Calendar.DAY_OF_MONTH),
                 cal.get(Calendar.WEEK_OF_YEAR),
                 cal.get(Calendar.DAY_OF_WEEK),
