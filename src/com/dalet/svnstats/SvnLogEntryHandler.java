@@ -84,7 +84,7 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
                 type = "prod";
                 branch = "builds";
                 fullVersion = firstPath.getPath().split("/")[3];
-                productVersion = fullVersion;
+                productVersion = productVersionByFullVersion(svnLogEntry, fullVersion);
             } else if (firstPath.getPath().startsWith("/branches/tnt")) {
                 product = "Italy";
                 type = "prod";
@@ -96,13 +96,7 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
                 type = "prod";
                 branch = "hotfix";
                 fullVersion = firstPath.getPath().split("/")[3];
-                String[] productVersionTokens = fullVersion.split("\\.");
-                if (productVersionTokens.length > 1) {
-                    productVersion = productVersionTokens[0] + "." + productVersionTokens[1];
-                } else {
-                    System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " fullVersion is too short: " + fullVersion + ": " + Arrays.toString(productVersionTokens));
-                    productVersion = fullVersion;
-                }
+                productVersion = productVersionByFullVersion(svnLogEntry, fullVersion);
             } else {
                 product = "other";
                 type = "other";
@@ -119,6 +113,18 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
                 productVersion,
                 fullVersion
         );
+    }
+
+    private String productVersionByFullVersion(SVNLogEntry svnLogEntry, String fullVersion) {
+        String productVersion;
+        String[] productVersionTokens = fullVersion.split("\\.");
+        if (productVersionTokens.length > 1) {
+            productVersion = productVersionTokens[0] + "." + productVersionTokens[1];
+        } else {
+            System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " fullVersion is too short: " + fullVersion + ": " + Arrays.toString(productVersionTokens));
+            productVersion = fullVersion;
+        }
+        return productVersion;
     }
 
     // Revision BIGINT, Date DATE, Year INTEGER, Month INTEGER, Day INTEGER, Week INTEGER, DayOfWeek INTEGER, Hour INTEGER, Minutes INTEGER, Sec INTEGER;
