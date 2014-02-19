@@ -41,7 +41,10 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
 
     @Override
     public void handleLogEntry(SVNLogEntry svnLogEntry) throws SVNException {
-        System.out.println("Handling revision: " + svnLogEntry.getRevision());
+        long revision = svnLogEntry.getRevision();
+        if (0 == (revision % 100)) {
+            System.out.println("Handling revision: " + revision);
+        }
         try {
             fillCommits(svnLogEntry);
             fillChangedFiles(svnLogEntry);
@@ -133,6 +136,8 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
         cal.setTime(svnLogEntry.getDate());
         insertDateTimeStatement.addrow(svnLogEntry.getRevision(),
                 cal.getTime(),
+                cal.getTime(),
+                cal.getTime(),
                 cal.get(Calendar.YEAR),
                 1 + cal.get(Calendar.MONTH),
                 cal.get(Calendar.DAY_OF_MONTH),
@@ -180,11 +185,13 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
             statement = sqlConnection.prepareStatement(sql);
         }
 
+        @SuppressWarnings("ConstantConditions") // false alert of IntelliJ
         public void addrow(Object... parameters) throws SQLException {
             for (int i = 0; i < parameters.length; ++i) {
                 String typeName = types.get(i);
                 Object parameter = parameters[i];
                 int idx = i + 1;
+                java.sql.Date sqlDate = (parameter instanceof java.util.Date) ? new java.sql.Date(((java.util.Date) parameter).getTime()) : null;
                 switch (typeName) {
                     case "BIGINT":
                         statement.setLong(idx, (long) parameter);
@@ -196,12 +203,13 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
                         statement.setString(idx, (String) parameter);
                         break;
                     case "DATE":
-                        if (parameter instanceof java.util.Date) {
-                            statement.setDate(idx, new Date(((java.util.Date) parameter).getTime()));
-                        } else {
-                            //noinspection ConstantConditions
-                            statement.setDate(idx, (java.sql.Date) parameter);
-                        }
+                        statement.setDate(idx, sqlDate);
+                        break;
+                    case "TIME":
+                        statement.setTime(idx, new java.sql.Time(sqlDate.getTime()));
+                        break;
+                    case "TIMESTAMP":
+                        statement.setTimestamp(idx, new Timestamp(sqlDate.getTime()));
                         break;
                     default:
                         throw new RuntimeException("Unknown column type: " + typeName);

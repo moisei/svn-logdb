@@ -12,6 +12,7 @@ public class Main {
 //        logDbBuilder.buildIndex(152000, SVNRepository.INVALID_REVISION);
 //        logDbBuilder.buildIndex(126991, SVNRepository.INVALID_REVISION);
 //        logDbBuilder.buildIndex(82994, 126990);
+//        logDbBuilder.rebuildIndex(82994, 82995);
         logDbBuilder.updateIndex();
         logDbBuilder.close();
         Runtime.getRuntime().exec(new String[]{"cmd", "/k", "C:\\Sources\\DaletAddons\\Svn-Statistics\\svnlogdb.bat"});

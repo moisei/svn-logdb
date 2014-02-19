@@ -55,7 +55,7 @@ public class SvnlogDbIndexer {
         executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  commits_revision ON commits (revision)");
         executeStatementIgnoreExisiting("CREATE TABLE FILES(Revision BIGINT, Type VARCHAR(10), Kind VARCHAR(10), File VARCHAR(" + MAX_PATH_LENGTH + "))");
         executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  files_revision_file ON files (revision,file)");
-        executeStatementIgnoreExisiting("CREATE TABLE DATE_TIME(Revision BIGINT, Date DATE, Year INTEGER, Month INTEGER, Day INTEGER, Week INTEGER, DayOfWeek INTEGER, Hour INTEGER, Minutes INTEGER, Sec INTEGER)");
+        executeStatementIgnoreExisiting("CREATE TABLE DATE_TIME(Revision BIGINT, Date DATE, Time TIME, DateTime DATETIME, Year INTEGER, Month INTEGER, Day INTEGER, Week INTEGER, DayOfWeek INTEGER, Hour INTEGER, Minutes INTEGER, Sec INTEGER)");
         executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  date_time_revision ON date_time (revision)");
         executeStatementIgnoreExisiting("CREATE TABLE VERSION(Revision BIGINT, Product VARCHAR(32), Type VARCHAR(10), Branch VARCHAR(1024), ProductVersion VARCHAR(100), FullVersion VARCHAR(100))");
         executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  version_revision ON version (revision)");
