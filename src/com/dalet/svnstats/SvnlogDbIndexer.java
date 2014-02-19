@@ -24,6 +24,7 @@ public class SvnlogDbIndexer {
     public static final int MAX_PATH_LENGTH = 2048;
     private SVNRepository svnRepository;
     private Connection sqlConnection;
+    private File dbfolder;
 
     public SvnlogDbIndexer(String svnUrl) throws ClassNotFoundException, IllegalAccessException, InstantiationException, SVNException, SQLException, IOException {
         initHsqldb();
@@ -45,7 +46,8 @@ public class SvnlogDbIndexer {
         props.put("password", "");
         props.put("jdbc.strict_md", "false");
         props.put("jdbc.get_column_name", "false");
-        String url = "jdbc:hsqldb:" + new File(".svnlogDB/db").getCanonicalPath();
+        dbfolder = new File(".svnlogDB/db").getCanonicalFile();
+        String url = "jdbc:hsqldb:" + dbfolder.getPath();
         System.out.println(url);
         sqlConnection = DriverManager.getConnection(url, props);
         sqlConnection.setAutoCommit(false);
@@ -61,12 +63,34 @@ public class SvnlogDbIndexer {
         executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  issues_revision_type_reference ON issues (revision, type, reference)");
     }
 
-    void svnlog2db(long startRevision, long endRevision) throws SVNException, SQLException {
+    void buildIndex(long startRevision, long endRevision) throws SVNException, SQLException {
         try (SvnLogEntryHandler svnLogEntryHandler = new SvnLogEntryHandler(sqlConnection)) {
             svnRepository.log(new String[]{"/"}, startRevision, endRevision, true, false, svnLogEntryHandler);
             sqlConnection.commit();
         }
         printReport();
+    }
+
+    void rebuildIndex(long startRevision, long endRevision) throws SVNException, SQLException, InterruptedException, IOException {
+        Runtime.getRuntime().exec(new String[]{"cmd", "/k", "rmdir", "/s", "/q", dbfolder.getPath()});
+        Thread.sleep(1000);
+        if (dbfolder.exists()) {
+            throw new IOException("Can't delete " + dbfolder);
+        }
+        buildIndex(startRevision, endRevision);
+    }
+
+    public void updateIndex() throws SQLException, SVNException {
+        try (Statement statement = sqlConnection.createStatement()) {
+            statement.execute("SELECT MAX(REVISION) FROM COMMITS");
+            try (ResultSet resultSet = statement.getResultSet()) {
+                if (!resultSet.next()) {
+                    throw new SQLException("Can't update empty database. It must be indexed at least omne time first");
+                }
+                long maxRevision = resultSet.getLong(1);
+                buildIndex(maxRevision + 1, SVNRepository.INVALID_REVISION);
+            }
+        }
     }
 
     public void close() {
@@ -117,5 +141,4 @@ public class SvnlogDbIndexer {
             }
         }
     }
-
 }
