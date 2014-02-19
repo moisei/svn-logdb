@@ -51,16 +51,31 @@ public class SvnlogDbIndexer {
         System.out.println(url);
         sqlConnection = DriverManager.getConnection(url, props);
         sqlConnection.setAutoCommit(false);
-        executeStatementIgnoreExisiting("CREATE TABLE COMMITS(Revision BIGINT, Date DATE, Author VARCHAR(100), ChangedFilesCount INTEGER, Message VARCHAR(" + MAX_MSG_LENGTH + "))");
-        executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  commits_revision ON commits (revision)");
-        executeStatementIgnoreExisiting("CREATE TABLE FILES(Revision BIGINT, Type VARCHAR(10), Kind VARCHAR(10), File VARCHAR(" + MAX_PATH_LENGTH + "))");
-        executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  files_revision_file ON files (revision,file)");
-        executeStatementIgnoreExisiting("CREATE TABLE DATE_TIME(Revision BIGINT, Date DATE, Time TIME, DateTime DATETIME, Year INTEGER, Month INTEGER, Day INTEGER, Week INTEGER, DayOfWeek INTEGER, Hour INTEGER, Minutes INTEGER, Sec INTEGER)");
-        executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  date_time_revision ON date_time (revision)");
-        executeStatementIgnoreExisiting("CREATE TABLE VERSION(Revision BIGINT, Product VARCHAR(32), Type VARCHAR(10), Branch VARCHAR(1024), ProductVersion VARCHAR(100), FullVersion VARCHAR(100))");
-        executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  version_revision ON version (revision)");
-        executeStatementIgnoreExisiting("CREATE TABLE ISSUES(Revision BIGINT, Type VARCHAR(10), Reference VARCHAR(100), NotesClientUrl VARCHAR(1024), NotesWebUrl VARCHAR(1024))");
-        executeStatementIgnoreExisiting("CREATE UNIQUE INDEX  issues_revision_type_reference ON issues (revision, type, reference)");
+        updateIgnoreExisiting("CREATE TABLE COMMITS(Revision BIGINT, Date DATE, Author VARCHAR(100), ChangedFilesCount INTEGER, Message VARCHAR(" + MAX_MSG_LENGTH + "))");
+        updateIgnoreExisiting("CREATE UNIQUE INDEX  commits_revision ON commits (revision)");
+        updateIgnoreExisiting("CREATE TABLE FILES(Revision BIGINT, Type VARCHAR(10), Kind VARCHAR(10), File VARCHAR(" + MAX_PATH_LENGTH + "))");
+        updateIgnoreExisiting("CREATE UNIQUE INDEX  files_revision_file ON files (revision,file)");
+        updateIgnoreExisiting("CREATE TABLE DATE_TIME(Revision BIGINT, Date DATE, Time TIME, DateTime DATETIME, Year INTEGER, Month INTEGER, Day INTEGER, Week INTEGER, DayOfWeek INTEGER, Hour INTEGER, Minutes INTEGER, Sec INTEGER)");
+        updateIgnoreExisiting("CREATE UNIQUE INDEX  date_time_revision ON date_time (revision)");
+        updateIgnoreExisiting("CREATE TABLE VERSION(Revision BIGINT, Product VARCHAR(32), Type VARCHAR(10), Branch VARCHAR(1024), ProductVersion VARCHAR(100), FullVersion VARCHAR(100))");
+        updateIgnoreExisiting("CREATE UNIQUE INDEX  version_revision ON version (revision)");
+        updateIgnoreExisiting("CREATE TABLE ISSUES(Revision BIGINT, Type VARCHAR(10), Reference VARCHAR(100), NotesClientUrl VARCHAR(1024), NotesWebUrl VARCHAR(1024))");
+        updateIgnoreExisiting("CREATE UNIQUE INDEX  issues_revision_type_reference ON issues (revision, type, reference)");
+    }
+
+    public void close() {
+        try {
+            svnRepository.closeSession();
+        } catch (Exception ignore) {
+        }
+        try {
+            sqlConnection.close();
+        } catch (Exception ignore) {
+        }
+        try {
+            DriverManager.getConnection("jdbc:Hsql:;shutdown=true");
+        } catch (Exception ignore) {
+        }
     }
 
     void buildIndex(long startRevision, long endRevision) throws SVNException, SQLException {
@@ -93,38 +108,17 @@ public class SvnlogDbIndexer {
         }
     }
 
-    public void close() {
-        try {
-            svnRepository.closeSession();
-        } catch (Exception ignore) {
-        }
-        try {
-            sqlConnection.close();
-        } catch (Exception ignore) {
-        }
-        try {
-            DriverManager.getConnection("jdbc:Hsql:;shutdown=true");
-        } catch (Exception ignore) {
-        }
-    }
-
-    private void executeStatementIgnoreExisiting(String sql) throws SQLException {
-        try {
-            executeStatement(sql);
+    private void updateIgnoreExisiting(String sql) throws SQLException {
+        try (Statement statement = sqlConnection.createStatement()) {
+            statement.executeUpdate(sql);
+            if (!sqlConnection.getAutoCommit()) {
+                sqlConnection.commit();
+            }
         } catch (SQLException e) {
             if (!e.getMessage().startsWith("object name already exists") && !e.getMessage().contains("unique constraint")) {
                 throw e;
             }
-            System.out.println("executeStatementIgnoreExisiting: " + e.getMessage());
-        }
-    }
-
-    private void executeStatement(String sql) throws SQLException {
-        try (Statement statement = sqlConnection.createStatement()) {
-            statement.execute(sql);
-            if (!sqlConnection.getAutoCommit()) {
-                sqlConnection.commit();
-            }
+            System.out.println("updateIgnoreExisiting: " + e.getMessage());
         }
     }
 
