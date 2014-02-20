@@ -15,6 +15,6 @@ public class Main {
 //        logDbBuilder.rebuildIndex(82994, 82995);
         logDbBuilder.updateIndex();
         logDbBuilder.close();
-        Runtime.getRuntime().exec(new String[]{"cmd", "/k", "C:\\Sources\\DaletAddons\\Svn-Statistics\\svnlogdb.bat"});
+        Runtime.getRuntime().exec(new String[]{"cmd", "/k", "svnlogdb.bat"});
     }
 }

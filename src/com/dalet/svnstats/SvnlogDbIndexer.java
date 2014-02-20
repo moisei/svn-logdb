@@ -11,7 +11,12 @@ import org.tmatesoft.svn.core.wc.SVNWCUtil;
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
+
+import static com.dalet.svnstats.SvnAuthors.AUTHORS_GROUP;
 
 /**
  * User: Moisei Rabinovich
@@ -61,6 +66,8 @@ public class SvnlogDbIndexer {
         updateIgnoreExisiting("CREATE UNIQUE INDEX  version_revision ON version (revision)");
         updateIgnoreExisiting("CREATE TABLE ISSUES(Revision BIGINT, Type VARCHAR(10), Reference VARCHAR(100), NotesClientUrl VARCHAR(1024), NotesWebUrl VARCHAR(1024))");
         updateIgnoreExisiting("CREATE UNIQUE INDEX  issues_revision_type_reference ON issues (revision, type, reference)");
+        updateIgnoreExisiting("CREATE TABLE AUTHORS(Auhtor VARCHAR(100), Team VARCHAR(100))");
+        updateIgnoreExisiting("CREATE UNIQUE INDEX  auhtor ON authors (auhtor)");
     }
 
     public void close() {
@@ -83,7 +90,19 @@ public class SvnlogDbIndexer {
             svnRepository.log(new String[]{"/"}, startRevision, endRevision, true, false, svnLogEntryHandler);
             sqlConnection.commit();
         }
+        fillAuhtors();
         printReport();
+    }
+
+    private void fillAuhtors() throws SQLException {
+        updateIgnoreExisiting("DELETE FROM AUTHORS");
+        InsertStatement insertAuhtors = new InsertStatement("AUTHORS", sqlConnection);
+        List<String> authors = new ArrayList<>(AUTHORS_GROUP.keySet());
+        Collections.sort(authors);
+        for (String author : authors) {
+            insertAuhtors.addrow(author, AUTHORS_GROUP.get(author));
+        }
+        insertAuhtors.close();
     }
 
     void rebuildIndex(long startRevision, long endRevision) throws SVNException, SQLException, InterruptedException, IOException {
