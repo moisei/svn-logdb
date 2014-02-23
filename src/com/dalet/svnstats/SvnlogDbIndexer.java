@@ -8,8 +8,10 @@ import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,12 +26,12 @@ import static com.dalet.svnstats.SvnAuthors.AUTHORS_GROUP;
  * Time: 4:43 PM
  */
 public class SvnlogDbIndexer {
-
     public static final int MAX_MSG_LENGTH = 1024 * 8;
     public static final int MAX_PATH_LENGTH = 2048;
+    public static final Path dbFile = FileSystems.getDefault().getPath(".svnlogDB", "db");
+
     private SVNRepository svnRepository;
     private Connection sqlConnection;
-    private File dbfolder;
 
     public SvnlogDbIndexer(String svnUrl) throws ClassNotFoundException, IllegalAccessException, InstantiationException, SVNException, SQLException, IOException {
         initHsqldb();
@@ -51,12 +53,13 @@ public class SvnlogDbIndexer {
         props.put("password", "");
         props.put("jdbc.strict_md", "false");
         props.put("jdbc.get_column_name", "false");
-        dbfolder = new File(".svnlogDB/db").getCanonicalFile();
-        String url = "jdbc:hsqldb:" + dbfolder.getPath();
+
+        String url = "jdbc:hsqldb:" + dbFile.toAbsolutePath().toString();
         System.out.println(url);
+        Files.createDirectories(dbFile.getParent());
         sqlConnection = DriverManager.getConnection(url, props);
         sqlConnection.setAutoCommit(false);
-        updateIgnoreExisiting("CREATE TABLE COMMITS(Revision BIGINT, Date DATE, Author VARCHAR(100), ChangedFilesCount INTEGER, Message VARCHAR(" + MAX_MSG_LENGTH + "))");
+        updateIgnoreExisiting("CREATE TABLE COMMITS(Revision BIGINT, Date DATE, Author VARCHAR(100), Team VARCHAR(100), ChangedFilesCount INTEGER, Message VARCHAR(" + MAX_MSG_LENGTH + "))");
         updateIgnoreExisiting("CREATE UNIQUE INDEX  commits_revision ON commits (revision)");
         updateIgnoreExisiting("CREATE TABLE FILES(Revision BIGINT, Type VARCHAR(10), Kind VARCHAR(10), File VARCHAR(" + MAX_PATH_LENGTH + "))");
         updateIgnoreExisiting("CREATE UNIQUE INDEX  files_revision_file ON files (revision,file)");
@@ -94,24 +97,13 @@ public class SvnlogDbIndexer {
         printReport();
     }
 
-    private void fillAuhtors() throws SQLException {
-        updateIgnoreExisiting("DELETE FROM AUTHORS");
-        InsertStatement insertAuhtors = new InsertStatement("AUTHORS", sqlConnection);
-        List<String> authors = new ArrayList<>(AUTHORS_GROUP.keySet());
-        Collections.sort(authors);
-        for (String author : authors) {
-            insertAuhtors.addrow(author, AUTHORS_GROUP.get(author));
-        }
-        insertAuhtors.close();
-    }
-
-    void rebuildIndex(long startRevision, long endRevision) throws SVNException, SQLException, InterruptedException, IOException {
-        Runtime.getRuntime().exec(new String[]{"cmd", "/k", "rmdir", "/s", "/q", dbfolder.getPath()});
+    public static void deleteIndex() throws IOException, InterruptedException {
+        Path dbParentFolder = dbFile.getParent();
+        Runtime.getRuntime().exec(new String[]{"cmd", "/k", "rmdir", "/s", "/q", dbParentFolder.toString()});
         Thread.sleep(1000);
-        if (dbfolder.exists()) {
-            throw new IOException("Can't delete " + dbfolder);
+        if (Files.exists(dbParentFolder)) {
+            throw new IOException("Can't delete " + dbParentFolder);
         }
-        buildIndex(startRevision, endRevision);
     }
 
     public void updateIndex() throws SQLException, SVNException {
@@ -133,12 +125,24 @@ public class SvnlogDbIndexer {
             if (!sqlConnection.getAutoCommit()) {
                 sqlConnection.commit();
             }
+            System.out.println("updateIgnoreExisiting: " + sql);
         } catch (SQLException e) {
             if (!e.getMessage().startsWith("object name already exists") && !e.getMessage().contains("unique constraint")) {
                 throw e;
             }
             System.out.println("updateIgnoreExisiting: " + e.getMessage());
         }
+    }
+
+    private void fillAuhtors() throws SQLException {
+        updateIgnoreExisiting("DELETE FROM AUTHORS");
+        InsertStatement insertAuhtors = new InsertStatement("AUTHORS", sqlConnection);
+        List<String> authors = new ArrayList<>(AUTHORS_GROUP.keySet());
+        Collections.sort(authors);
+        for (String author : authors) {
+            insertAuhtors.addrow(author, AUTHORS_GROUP.get(author));
+        }
+        insertAuhtors.close();
     }
 
     private void printReport() throws SQLException {

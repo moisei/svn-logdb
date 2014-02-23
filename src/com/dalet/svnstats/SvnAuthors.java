@@ -9,6 +9,7 @@ import java.util.HashMap;
  */
 public class SvnAuthors {
     public static final HashMap<String, String> AUTHORS_GROUP = new HashMap<>();
+
     static {
         AUTHORS_GROUP.put("abelulu", "video");
         AUTHORS_GROUP.put("adavidovich", "core");
@@ -114,5 +115,13 @@ public class SvnAuthors {
         AUTHORS_GROUP.put("ydagan", "main");
         AUTHORS_GROUP.put("ykrief", "core");
         AUTHORS_GROUP.put("zorenbakh", "main");
+    }
+
+    public static String getTeam(String author) {
+        author = author.toLowerCase();
+        if (null == AUTHORS_GROUP.get(author)) {
+            AUTHORS_GROUP.put(author, "other");
+        }
+        return AUTHORS_GROUP.get(author);
     }
 }

@@ -157,7 +157,8 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
             System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " message is too long: " + svnLogEntry.getMessage().length());
             msg = svnLogEntry.getMessage().substring(0, SvnlogDbIndexer.MAX_MSG_LENGTH);
         }
-        insertCommitsStatement.addrow(svnLogEntry.getRevision(), new Date(svnLogEntry.getDate().getTime()), svnLogEntry.getAuthor(), svnLogEntry.getChangedPaths().size(), msg);
+        String team = SvnAuthors.getTeam(svnLogEntry.getAuthor());
+        insertCommitsStatement.addrow(svnLogEntry.getRevision(), new Date(svnLogEntry.getDate().getTime()), svnLogEntry.getAuthor(), team, svnLogEntry.getChangedPaths().size(), msg);
     }
 
     private void fillChangedFiles(SVNLogEntry svnLogEntry) throws SQLException {
