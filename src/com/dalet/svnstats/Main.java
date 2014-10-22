@@ -1,5 +1,6 @@
 package com.dalet.svnstats;
 
+import org.apache.log4j.BasicConfigurator;
 import org.tmatesoft.svn.core.io.SVNRepository;
 
 /**
@@ -9,6 +10,7 @@ import org.tmatesoft.svn.core.io.SVNRepository;
  */
 public class Main {
     public static void main(String[] args) throws Exception {
+        BasicConfigurator.configure();
         SvnlogDbIndexer.deleteIndex();
         SvnlogDbIndexer logDbBuilder = new SvnlogDbIndexer("svn://gfn-svn:3692");
 //        logDbBuilder.buildIndex(152000, SVNRepository.INVALID_REVISION);

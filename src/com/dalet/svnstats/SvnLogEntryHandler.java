@@ -3,9 +3,13 @@ package com.dalet.svnstats;
 import org.tmatesoft.svn.core.*;
 
 import java.io.Closeable;
-import java.sql.*;
+import java.sql.Connection;
 import java.sql.Date;
-import java.util.*;
+import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
+import java.util.Map;
 
 import static com.dalet.svnstats.LotusNotesMessageUtils.extractReferencedBugs;
 import static com.dalet.svnstats.LotusNotesMessageUtils.extractReferencedFeatures;
@@ -41,131 +45,140 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
 
     @Override
     public void handleLogEntry(SVNLogEntry svnLogEntry) throws SVNException {
-        long revision = svnLogEntry.getRevision();
-        if (0 == (revision % 100)) {
-            System.out.println("Handling revision: " + revision);
+        if (0 == (svnLogEntry.getRevision() % 100)) {
+            System.out.println("Handling revision: " + svnLogEntry.getRevision());
         }
         try {
-            fillCommits(svnLogEntry);
-            fillChangedFiles(svnLogEntry);
-            fillDateTime(svnLogEntry);
-            fillVersion(svnLogEntry);
-            fillIssues(svnLogEntry);
+            new SvnLogEntryHandlerHelper(svnLogEntry).handle();
         } catch (SQLException e) {
             throw new SVNException(SVNErrorMessage.create(SVNErrorCode.UNKNOWN, e.getMessage()), e);
         }
     }
 
-    // Revision BIGINT, Type VARCHAR(10), Reference VARCHAR(100), NotesClientUrl VARCHAR(1024), NotesWebUrl VARCHAR(1024))
-    private void fillIssues(SVNLogEntry svnLogEntry) throws SQLException {
-        String message = svnLogEntry.getMessage();
-        for (String feature : extractReferencedFeatures(message)) {
-            insertIssuesStatement.addrow(svnLogEntry.getRevision(), "F", feature, "", "");
-        }
-        for (String bug : extractReferencedBugs(message)) {
-            insertIssuesStatement.addrow(svnLogEntry.getRevision(), "B", bug, "", "");
-        }
-    }
+    private class SvnLogEntryHandlerHelper {
+        private SVNLogEntry svnLogEntry;
 
-    // VERSION(Revision BIGINT, Product VARCHAR(32), Type VARCHAR(10), Branch VARCHAR(1024), ProductVersion VARCHAR(100), FullVersion VARCHAR(100)
-    private void fillVersion(SVNLogEntry svnLogEntry) throws SQLException {
-        String product;
-        String type;
-        String branch;
-        String fullVersion;
-        String productVersion;
-        if (svnLogEntry.getChangedPaths().isEmpty()) {
-            product = "other";
-            type = "other";
-            branch = "other";
-            fullVersion = "other";
-            productVersion = "other";
-        } else {
-            SVNLogEntryPath firstPath = svnLogEntry.getChangedPaths().entrySet().iterator().next().getValue();
-            if (firstPath.getPath().startsWith("/branches/builds")) {
-                product = "Dalet";
-                type = "prod";
-                branch = "builds";
-                fullVersion = firstPath.getPath().split("/")[3];
-                productVersion = productVersionByFullVersion(svnLogEntry, fullVersion);
-            } else if (firstPath.getPath().startsWith("/branches/tnt")) {
-                product = "Italy";
-                type = "prod";
-                branch = "tnt";
-                fullVersion = "other";
-                productVersion = "other";
-            } else if (firstPath.getPath().startsWith("/branches/hotfixes")) {
-                product = "Dalet";
-                type = "prod";
-                branch = "hotfix";
-                fullVersion = firstPath.getPath().split("/")[3];
-                productVersion = productVersionByFullVersion(svnLogEntry, fullVersion);
-            } else {
+        private SvnLogEntryHandlerHelper(SVNLogEntry svnLogEntry) throws SVNException, SQLException {
+            this.svnLogEntry = svnLogEntry;
+        }
+
+        private void handle() throws SQLException {
+            fillCommits();
+            fillChangedFiles();
+            fillDateTime();
+            fillVersion();
+            fillIssues();
+        }
+
+        // Revision BIGINT, Type VARCHAR(10), Reference VARCHAR(100), NotesClientUrl VARCHAR(1024), NotesWebUrl VARCHAR(1024))
+        private void fillIssues() throws SQLException {
+            String message = svnLogEntry.getMessage();
+            for (String feature : extractReferencedFeatures(message)) {
+                insertIssuesStatement.addrow(svnLogEntry.getRevision(), "F", feature, "", "");
+            }
+            for (String bug : extractReferencedBugs(message)) {
+                insertIssuesStatement.addrow(svnLogEntry.getRevision(), "B", bug, "", "");
+            }
+        }
+
+        // VERSION(Revision BIGINT, Product VARCHAR(32), Type VARCHAR(10), Branch VARCHAR(1024), ProductVersion VARCHAR(100), FullVersion VARCHAR(100)
+        private void fillVersion() throws SQLException {
+            String product;
+            String type;
+            String branch;
+            String fullVersion;
+            String productVersion;
+            if (svnLogEntry.getChangedPaths().isEmpty()) {
                 product = "other";
                 type = "other";
                 branch = "other";
                 fullVersion = "other";
                 productVersion = "other";
+            } else {
+                SVNLogEntryPath firstPath = svnLogEntry.getChangedPaths().entrySet().iterator().next().getValue();
+                if (firstPath.getPath().startsWith("/branches/builds")) {
+                    product = "Dalet";
+                    type = "prod";
+                    branch = "builds";
+                    fullVersion = firstPath.getPath().split("/")[3];
+                    productVersion = productVersionByFullVersion(svnLogEntry, fullVersion);
+                } else if (firstPath.getPath().startsWith("/branches/tnt")) {
+                    product = "Italy";
+                    type = "prod";
+                    branch = "tnt";
+                    fullVersion = "other";
+                    productVersion = "other";
+                } else if (firstPath.getPath().startsWith("/branches/hotfixes")) {
+                    product = "Dalet";
+                    type = "prod";
+                    branch = "hotfix";
+                    fullVersion = firstPath.getPath().split("/")[3];
+                    productVersion = productVersionByFullVersion(svnLogEntry, fullVersion);
+                } else {
+                    product = "other";
+                    type = "other";
+                    branch = "other";
+                    fullVersion = "other";
+                    productVersion = "other";
+                }
+            }
+            insertVersionStatement.addrow(
+                    svnLogEntry.getRevision(),
+                    product,
+                    type,
+                    branch,
+                    productVersion,
+                    fullVersion
+            );
+        }
+
+        private String productVersionByFullVersion(SVNLogEntry svnLogEntry, String fullVersion) {
+            String[] productVersionTokens = fullVersion.split("\\.");
+            if (productVersionTokens.length > 1) {
+                return productVersionTokens[0] + "." + productVersionTokens[1];
+            } else {
+                System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " fullVersion is too short: " + fullVersion + ": " + Arrays.toString(productVersionTokens));
+                return fullVersion;
             }
         }
-        insertVersionStatement.addrow(
-                svnLogEntry.getRevision(),
-                product,
-                type,
-                branch,
-                productVersion,
-                fullVersion
-        );
-    }
 
-    private String productVersionByFullVersion(SVNLogEntry svnLogEntry, String fullVersion) {
-        String productVersion;
-        String[] productVersionTokens = fullVersion.split("\\.");
-        if (productVersionTokens.length > 1) {
-            productVersion = productVersionTokens[0] + "." + productVersionTokens[1];
-        } else {
-            System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " fullVersion is too short: " + fullVersion + ": " + Arrays.toString(productVersionTokens));
-            productVersion = fullVersion;
+        // Revision BIGINT, Date DATE, Year INTEGER, Month INTEGER, Day INTEGER, Week INTEGER, DayOfWeek INTEGER, Hour INTEGER, Minutes INTEGER, Sec INTEGER;
+        private void fillDateTime() throws SQLException {
+            Calendar cal = new GregorianCalendar();
+            cal.setTime(svnLogEntry.getDate());
+            insertDateTimeStatement.addrow(svnLogEntry.getRevision(),
+                    cal.getTime(),
+                    cal.getTime(),
+                    cal.getTime(),
+                    cal.get(Calendar.YEAR),
+                    1 + cal.get(Calendar.MONTH),
+                    cal.get(Calendar.DAY_OF_MONTH),
+                    cal.get(Calendar.WEEK_OF_YEAR),
+                    cal.get(Calendar.DAY_OF_WEEK),
+                    cal.get(Calendar.HOUR),
+                    cal.get(Calendar.MINUTE),
+                    cal.get(Calendar.SECOND)
+            );
         }
-        return productVersion;
-    }
 
-    // Revision BIGINT, Date DATE, Year INTEGER, Month INTEGER, Day INTEGER, Week INTEGER, DayOfWeek INTEGER, Hour INTEGER, Minutes INTEGER, Sec INTEGER;
-    private void fillDateTime(SVNLogEntry svnLogEntry) throws SQLException {
-        Calendar cal = new GregorianCalendar();
-        cal.setTime(svnLogEntry.getDate());
-        insertDateTimeStatement.addrow(svnLogEntry.getRevision(),
-                cal.getTime(),
-                cal.getTime(),
-                cal.getTime(),
-                cal.get(Calendar.YEAR),
-                1 + cal.get(Calendar.MONTH),
-                cal.get(Calendar.DAY_OF_MONTH),
-                cal.get(Calendar.WEEK_OF_YEAR),
-                cal.get(Calendar.DAY_OF_WEEK),
-                cal.get(Calendar.HOUR),
-                cal.get(Calendar.MINUTE),
-                cal.get(Calendar.SECOND)
-        );
-    }
-
-    private void fillCommits(SVNLogEntry svnLogEntry) throws SQLException {
-        String msg;
-        if (svnLogEntry.getMessage().length() < SvnlogDbIndexer.MAX_MSG_LENGTH) {
-            msg = svnLogEntry.getMessage();
-        } else {
-            System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " message is too long: " + svnLogEntry.getMessage().length());
-            msg = svnLogEntry.getMessage().substring(0, SvnlogDbIndexer.MAX_MSG_LENGTH);
+        private void fillCommits() throws SQLException {
+            String msg;
+            if (svnLogEntry.getMessage().length() < SvnlogDbIndexer.MAX_MSG_LENGTH) {
+                msg = svnLogEntry.getMessage();
+            } else {
+                System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " message is too long: " + svnLogEntry.getMessage().length());
+                msg = svnLogEntry.getMessage().substring(0, SvnlogDbIndexer.MAX_MSG_LENGTH);
+            }
+            String team = SvnAuthors.getTeam(svnLogEntry.getAuthor());
+            insertCommitsStatement.addrow(svnLogEntry.getRevision(), new Date(svnLogEntry.getDate().getTime()), svnLogEntry.getAuthor(), team, svnLogEntry.getChangedPaths().size(), msg);
         }
-        String team = SvnAuthors.getTeam(svnLogEntry.getAuthor());
-        insertCommitsStatement.addrow(svnLogEntry.getRevision(), new Date(svnLogEntry.getDate().getTime()), svnLogEntry.getAuthor(), team, svnLogEntry.getChangedPaths().size(), msg);
-    }
 
-    private void fillChangedFiles(SVNLogEntry svnLogEntry) throws SQLException {
-        Map<String, SVNLogEntryPath> changedPaths = svnLogEntry.getChangedPaths();
-        for (String path : changedPaths.keySet()) {
-            SVNLogEntryPath change = changedPaths.get(path);
-            insertFilesStatement.addrow(svnLogEntry.getRevision(), String.valueOf(change.getType()), change.getKind().toString(), change.getPath());
+        private void fillChangedFiles() throws SQLException {
+            Map<String, SVNLogEntryPath> changedPaths = svnLogEntry.getChangedPaths();
+            for (String path : changedPaths.keySet()) {
+                SVNLogEntryPath change = changedPaths.get(path);
+                insertFilesStatement.addrow(svnLogEntry.getRevision(), String.valueOf(change.getType()), change.getKind().toString(), change.getPath());
+            }
         }
     }
 

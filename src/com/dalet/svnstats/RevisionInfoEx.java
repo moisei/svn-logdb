@@ -28,7 +28,7 @@ public class RevisionInfoEx implements RevisionInfoIfc {
     }
 
     private void initFiles() {
-        files = new ArrayList<String>(10);
+        files = new ArrayList<>(10);
         Element pathsElement = logentryElement.getChild("paths");
         if (null == pathsElement) {
             return;
@@ -119,8 +119,8 @@ public class RevisionInfoEx implements RevisionInfoIfc {
     }
 
     private void initIssues() {
-        bugs = new HashSet<String>();
-        featues = new HashSet<String>();
+        bugs = new HashSet<>();
+        featues = new HashSet<>();
         Matcher m = NOTES_ISSUE_PATTERN.matcher(getMsg());
         while (m.find()) {
             String issue = formatIssue(m.group());
