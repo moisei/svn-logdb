@@ -44,7 +44,7 @@ public class T {
             sb.append(line).append("\n");
         }
         lnr.close();
-        ArrayList<String> keysArray = new ArrayList<String>(errorLines.keySet());
+        ArrayList<String> keysArray = new ArrayList<>(errorLines.keySet());
         Collections.sort(keysArray);
         for (String errorLine : keysArray) {
             System.out.println("==== " + errorLine);
@@ -57,7 +57,7 @@ public class T {
 
     }
 
-    static HashMap<String, List<String>> errorLines = new HashMap<String, List<String>>();
+    static HashMap<String, List<String>> errorLines = new HashMap<>();
 
     private static void writeToFile(StringBuffer sb) {
         String[] lines = sb.toString().split("\n");

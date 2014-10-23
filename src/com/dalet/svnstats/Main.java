@@ -1,7 +1,11 @@
 package com.dalet.svnstats;
 
 import org.apache.log4j.BasicConfigurator;
+import org.tmatesoft.svn.core.SVNException;
 import org.tmatesoft.svn.core.io.SVNRepository;
+
+import java.io.IOException;
+import java.sql.SQLException;
 
 /**
  * User: Moisei Rabinovich
@@ -11,14 +15,34 @@ import org.tmatesoft.svn.core.io.SVNRepository;
 public class Main {
     public static void main(String[] args) throws Exception {
         BasicConfigurator.configure();
-        SvnlogDbIndexer.deleteIndex();
-        SvnlogDbIndexer logDbBuilder = new SvnlogDbIndexer("svn://gfn-svn:3692");
-//        logDbBuilder.buildIndex(152000, SVNRepository.INVALID_REVISION);
-//        logDbBuilder.buildIndex(126991, SVNRepository.INVALID_REVISION);
-//        logDbBuilder.buildIndex(82994, 126990);
-        logDbBuilder.buildIndex(82994, SVNRepository.INVALID_REVISION);
-//        logDbBuilder.updateIndex();
-        logDbBuilder.close();
+        long startRevision = initArg(args, 0, 82994);
+        long endRevision = initArg(args, 1, SVNRepository.INVALID_REVISION);
+        String svnUrl = (args.length < 3)?"svn://gfn-svn:3692":args[2];
+        rebuildDatabase(startRevision, endRevision, svnUrl);
         Runtime.getRuntime().exec(new String[]{"cmd", "/k", "svnlogdb.bat"});
+    }
+
+    private static long initArg(String[] args, int index, long defaultValue) {
+        if (args.length < (1 + index)) {
+            return defaultValue;
+        }
+        try {
+            return Long.parseLong(args[index]);
+        } catch (NumberFormatException e) {
+            usage();
+            throw e;
+        }
+    }
+
+    private static void usage() {
+        System.out.println("java -jar dalet-svn-stats.jar [<start revision> default 0] [<end revision> default HEAD]");
+        System.out.println("Index Dalet svn repo history to SQL database");
+    }
+
+    private static void rebuildDatabase(long startRevision, long endRevision, String svnUrl) throws IOException, InterruptedException, ClassNotFoundException, IllegalAccessException, InstantiationException, SVNException, SQLException {
+        SvnlogDbIndexer.deleteIndex();
+        SvnlogDbIndexer logDbBuilder = new SvnlogDbIndexer(svnUrl);
+        logDbBuilder.buildIndex(startRevision, endRevision);
+        logDbBuilder.close();
     }
 }
