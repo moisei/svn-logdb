@@ -1,4 +1,4 @@
-select count (1) from commits
+select count (1) cnt, min(revision) minrev, max(revision)  maxrev from commits
 ------------------------------------------------------------------------------------------
 
 -- commits per build vs hotfix per month
