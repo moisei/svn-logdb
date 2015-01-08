@@ -1,2 +1,5 @@
 /.svnlogDB*
 /Svn-Statistics.iml
+/.idea
+/out
+/src/com/dalet/lotus/Configuration.java
