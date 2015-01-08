@@ -11,8 +11,8 @@ import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.Map;
 
-import static com.dalet.svnstats.LotusNotesMessageUtils.extractReferencedBugs;
-import static com.dalet.svnstats.LotusNotesMessageUtils.extractReferencedFeatures;
+import static com.dalet.lotus.LotusNotesIssueReferenceUtils.extractReferencedBugs;
+import static com.dalet.lotus.LotusNotesIssueReferenceUtils.extractReferencedFeatures;
 
 /**
  * User: Moisei Rabinovich

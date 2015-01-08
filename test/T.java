@@ -1,4 +1,4 @@
-import com.dalet.svnstats.LotusNotesClient;
+import com.dalet.lotus.LotusNotesClient;
 import lotus.domino.Document;
 import lotus.domino.DocumentCollection;
 import lotus.domino.NotesException;
@@ -11,7 +11,7 @@ import java.io.IOException;
 import java.io.LineNumberReader;
 import java.util.*;
 
-import static com.dalet.svnstats.LotusNotesClient.getStringValue;
+import static com.dalet.lotus.LotusNotesClient.getStringValue;
 
 /**
  * User: Moisei Rabinovich
