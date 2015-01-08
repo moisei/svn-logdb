@@ -1,6 +1,7 @@
 # svn-logdb
 Import a log of svn repository to SQL database and create useful indexes.
-Useful for staistic  analysis like:
+
+Useful for statistical analysis, like following:
   - commits per build vs hotfix per month
   - commits per specific build/hf per month 
   - commits, changed files, ratio, per build vs hotfix per month
@@ -12,6 +13,3 @@ See sample queries in svnlogdb-sample-scripts.sql
 
 
 NOTE: the project is very much oriented to Dalet svn repo structure
-
-
-
