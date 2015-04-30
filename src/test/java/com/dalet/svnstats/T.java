@@ -1,9 +1,12 @@
+package com.dalet.svnstats;
+
 import com.dalet.lotus.LotusNotesClient;
 import lotus.domino.Document;
 import lotus.domino.DocumentCollection;
 import lotus.domino.NotesException;
 import org.apache.log4j.BasicConfigurator;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.FileReader;
@@ -19,6 +22,7 @@ import static com.dalet.lotus.LotusNotesClient.getStringValue;
  * Time: 10:52 AM
  */
 @SuppressWarnings("StatementWithEmptyBody")
+@Ignore
 public class T {
     @Before
     public void setup() {
@@ -93,7 +97,7 @@ public class T {
             for (Object o : doc.getItems()) {
                 String valueName = o.toString();
                 try {
-                    System.out.println( o + " " + LotusNotesClient.getStringValue(doc, valueName, ""));
+                    System.out.println(o + " " + LotusNotesClient.getStringValue(doc, valueName, ""));
                 } catch (NotesException e) {
                     //
                 }

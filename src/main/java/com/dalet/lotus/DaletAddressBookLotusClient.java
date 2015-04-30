@@ -5,7 +5,6 @@ import lotus.domino.DocumentCollection;
 import lotus.domino.Item;
 import lotus.domino.NotesException;
 import org.apache.log4j.BasicConfigurator;
-import org.junit.Test;
 
 import java.util.*;
 
@@ -18,7 +17,7 @@ import static com.dalet.lotus.Configuration.NOTES_PASSWORD;
  */
 public class DaletAddressBookLotusClient {
 
-    private final static Set<String> VALID_SCRUMS = new HashSet<>(Arrays.asList(
+    final static Set<String> VALID_SCRUMS = new HashSet<>(Arrays.asList(
             "scrum-managers",
             "scrumamberfin",
             "scrumautomation",
@@ -39,20 +38,7 @@ public class DaletAddressBookLotusClient {
             "scrumxchange"));
 
 
-    @Test
-    public void test1() throws Exception {
-        Set<String> users = new HashSet<String>() {{
-            add("ctaboch");
-        }};
-        Set<String> groupNames = new HashSet<String>() {{
-            add("scrumux");
-        }};
-        groupNames = VALID_SCRUMS;
-        Map<String, Set<String>> groupsForUsers = getGroupsForUsers(groupNames, users, "other");
-        System.out.println(groupsForUsers);
-    }
-
-    private static Map<String, Set<String>> getGroupsForUsers(Set<String> groupNames, Set<String> userNames, String groupForUnknownUsers) throws NotesException {
+    static Map<String, Set<String>> getGroupsForUsers(Set<String> groupNames, Set<String> userNames, String groupForUnknownUsers) throws NotesException {
         BasicConfigurator.configure();
         LotusNotesClient lnc = new LotusNotesClient(NOTES_PASSWORD, true);
         Map<String, Set<String>> groupsForUsers = new HashMap<>();
