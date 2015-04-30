@@ -4,3 +4,8 @@
 /out
 /src/com/dalet/lotus/Configuration.java
 /.gradle
+/gradlew
+/build
+/gradle
+/src/main/java/com/dalet/lotus/Configuration.java
+/SvnlogdbBuilder.iml
