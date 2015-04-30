@@ -17,9 +17,16 @@ public class Main {
         BasicConfigurator.configure();
         long startRevision = initArg(args, 0, 82994);
         long endRevision = initArg(args, 1, SVNRepository.INVALID_REVISION);
-        String svnUrl = (args.length < 3)?"svn://gfn-svn:3692":args[2];
+        String svnUrl = initArg(args, 3, "svn://gfn-svn:3692");
         rebuildDatabase(startRevision, endRevision, svnUrl);
-        Runtime.getRuntime().exec(new String[]{"cmd", "/k", "src/client-scripts/svnlogdb.bat"});
+        Runtime.getRuntime().exec(new String[]{"cmd", "/k", "bin/svnlogdb.bat"});
+    }
+
+    private static String initArg(String[] args, int index, String defaultValue) {
+        if (args.length < (1 + index)) {
+            return defaultValue;
+        }
+        return args[index];
     }
 
     private static long initArg(String[] args, int index, long defaultValue) {

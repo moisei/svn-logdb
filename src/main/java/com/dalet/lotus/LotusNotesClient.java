@@ -40,6 +40,10 @@ public class LotusNotesClient implements Closeable {
         return notesSession;
     }
 
+    public LotusNotesClient(boolean createSession) throws NotesException {
+        this(System.getProperty("NOTES.PASSWORD"), createSession);
+    }
+
     public LotusNotesClient(String notesPassword) {
         this.notesPassword = notesPassword;
         this.notesSession = null;
