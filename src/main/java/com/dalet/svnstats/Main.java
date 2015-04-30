@@ -19,7 +19,7 @@ public class Main {
         long endRevision = initArg(args, 1, SVNRepository.INVALID_REVISION);
         String svnUrl = (args.length < 3)?"svn://gfn-svn:3692":args[2];
         rebuildDatabase(startRevision, endRevision, svnUrl);
-        Runtime.getRuntime().exec(new String[]{"cmd", "/k", "svnlogdb.bat"});
+        Runtime.getRuntime().exec(new String[]{"cmd", "/k", "src/client-scripts/svnlogdb.bat"});
     }
 
     private static long initArg(String[] args, int index, long defaultValue) {
