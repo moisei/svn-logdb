@@ -1,5 +1,0 @@
-Manifest-Version: 1.0
-Class-Path: svnkit-1.8.3.jar jdom-1.1.2.jar Notes.jar hsqldb.jar log4j
- -1.2.16.jar
-Main-Class: com.dalet.svnstats.Main
-
