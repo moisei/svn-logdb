@@ -72,7 +72,7 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
 
         // Revision BIGINT, Type VARCHAR(10), Reference VARCHAR(100), NotesClientUrl VARCHAR(1024), NotesWebUrl VARCHAR(1024))
         private void fillIssues() throws SQLException {
-            String message = svnLogEntry.getMessage();
+            String message = svnLogEntry.getMessage() == null ? "" : svnLogEntry.getMessage();
             for (String feature : extractReferencedFeatures(message)) {
                 insertIssuesStatement.addrow(svnLogEntry.getRevision(), "F", feature, "", "");
             }
@@ -162,12 +162,15 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
         }
 
         private void fillCommits() throws SQLException {
-            String msg;
-            if (svnLogEntry.getMessage().length() < SvnlogDbIndexer.MAX_MSG_LENGTH) {
-                msg = svnLogEntry.getMessage();
+            String msg = svnLogEntry.getMessage();
+            if (msg == null) {
+                System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " MESSAGE IS NULL ");
+                msg = "";
+            } else if (msg.length() >= SvnlogDbIndexer.MAX_MSG_LENGTH) {
+                System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " message is too long: " + msg.length());
+                msg = msg.substring(0, SvnlogDbIndexer.MAX_MSG_LENGTH);
             } else {
-                System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " message is too long: " + svnLogEntry.getMessage().length());
-                msg = svnLogEntry.getMessage().substring(0, SvnlogDbIndexer.MAX_MSG_LENGTH);
+                // msg is OK
             }
             String team = SvnAuthors.getTeam(svnLogEntry.getAuthor());
             insertCommitsStatement.addrow(svnLogEntry.getRevision(), new Date(svnLogEntry.getDate().getTime()), svnLogEntry.getAuthor(), team, svnLogEntry.getChangedPaths().size(), msg);

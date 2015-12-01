@@ -8,6 +8,7 @@ import org.tmatesoft.svn.core.io.SVNRepository;
 import org.tmatesoft.svn.core.io.SVNRepositoryFactory;
 import org.tmatesoft.svn.core.wc.SVNWCUtil;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -25,7 +26,7 @@ import static com.dalet.svnstats.SvnAuthors.AUTHORS_GROUP;
  * Date: 2/16/14
  * Time: 4:43 PM
  */
-public class SvnlogDbIndexer {
+public class SvnlogDbIndexer implements Closeable {
     public static final int MAX_MSG_LENGTH = 1024 * 8;
     public static final int MAX_PATH_LENGTH = 2048;
     public static final Path dbFile = FileSystems.getDefault().getPath(".svnlogDB", "db");
@@ -34,7 +35,6 @@ public class SvnlogDbIndexer {
     private Connection sqlConnection;
 
     public SvnlogDbIndexer(String svnUrl) throws ClassNotFoundException, IllegalAccessException, InstantiationException, SVNException, SQLException, IOException {
-        initHsqldb();
         initSvn(svnUrl);
     }
 
@@ -53,7 +53,6 @@ public class SvnlogDbIndexer {
         props.put("password", "");
         props.put("jdbc.strict_md", "false");
         props.put("jdbc.get_column_name", "false");
-
         String url = "jdbc:hsqldb:" + dbFile.toAbsolutePath().toString();
         System.out.println(url);
         Files.createDirectories(dbFile.getParent());
@@ -73,6 +72,7 @@ public class SvnlogDbIndexer {
         updateIgnoreExisiting("CREATE UNIQUE INDEX  auhtor ON authors (auhtor)");
     }
 
+    @Override
     public void close() {
         try {
             svnRepository.closeSession();
@@ -88,7 +88,7 @@ public class SvnlogDbIndexer {
         }
     }
 
-    void buildIndex(long startRevision, long endRevision) throws SVNException, SQLException {
+    private void buildIndex(long startRevision, long endRevision) throws SVNException, SQLException, ClassNotFoundException, IOException, InstantiationException, IllegalAccessException {
         try (SvnLogEntryHandler svnLogEntryHandler = new SvnLogEntryHandler(sqlConnection)) {
             svnRepository.log(new String[]{"/"}, startRevision, endRevision, true, false, svnLogEntryHandler);
             sqlConnection.commit();
@@ -106,15 +106,40 @@ public class SvnlogDbIndexer {
         }
     }
 
-    public void updateIndex() throws SQLException, SVNException {
+    public void updateIndex(long endRevision) throws SQLException, SVNException, ClassNotFoundException, InstantiationException, IllegalAccessException, IOException {
+        initHsqldb();
+        long maxRevision = getMaxRevision();
+        if (SVNRepository.INVALID_REVISION == maxRevision) {
+            throw new SQLException("Can't update empty database. It must be indexed at least one time first");
+        }
+        buildIndex(maxRevision + 1, endRevision);
+    }
+
+    public void updateOrRebuildIndex(long startRevision, long endRevision) throws SQLException, SVNException, ClassNotFoundException, InstantiationException, IllegalAccessException, IOException {
+        initHsqldb();
+        long maxRevision = getMaxRevision();
+        if (SVNRepository.INVALID_REVISION == maxRevision) {
+            buildIndex(startRevision, endRevision);
+        } else {
+            buildIndex(maxRevision + 1, endRevision);
+        }
+
+    }
+
+    public void forceRebuildIndex(long startRevision, long endRevision) throws SQLException, SVNException, ClassNotFoundException, InstantiationException, IllegalAccessException, IOException, InterruptedException {
+        deleteIndex();
+        initHsqldb();
+        buildIndex(startRevision, endRevision);
+    }
+
+    private long getMaxRevision() throws SQLException {
         try (Statement statement = sqlConnection.createStatement()) {
             statement.execute("SELECT MAX(REVISION) FROM COMMITS");
             try (ResultSet resultSet = statement.getResultSet()) {
                 if (!resultSet.next()) {
-                    throw new SQLException("Can't update empty database. It must be indexed at least omne time first");
+                    return SVNRepository.INVALID_REVISION;
                 }
-                long maxRevision = resultSet.getLong(1);
-                buildIndex(maxRevision + 1, SVNRepository.INVALID_REVISION);
+                return resultSet.getLong(1);
             }
         }
     }
