@@ -24,6 +24,9 @@ import static com.dalet.lotus.LotusNotesClient.getStringValue;
 @SuppressWarnings("StatementWithEmptyBody")
 @Ignore
 public class T {
+
+    private static final String NOTES_PASSWORD = "";
+
     @Before
     public void setup() {
         BasicConfigurator.resetConfiguration();
@@ -92,7 +95,7 @@ public class T {
     @Test
     public void test2() throws Exception {
         String reference = "#69317 - LJ";
-        try (LotusNotesClient lnc = new LotusNotesClient("poiuytrewq", true)) {
+        try (LotusNotesClient lnc = new LotusNotesClient(NOTES_PASSWORD, true)) {
             Document doc = LotusNotesClient.findOriginalDocumentByReference(lnc.getBugsDb(), reference);
             for (Object o : doc.getItems()) {
                 String valueName = o.toString();
@@ -109,7 +112,7 @@ public class T {
     public void test1() throws Exception {
         int prefixLength = "12/08/2013 - ".length();
         TreeSet<String> historyMessages = new TreeSet<>();
-        try (LotusNotesClient lnc = new LotusNotesClient("poiuytrewq", true)) {
+        try (LotusNotesClient lnc = new LotusNotesClient(NOTES_PASSWORD, true)) {
 //            Document doc = LotusNotesClient.findOriginalDocumentByReference(lnc.getBugsDb(), "#65235 - TZ");
 //            System.out.println(LotusNotesClient.getStringValue(doc, "History", "DEFAULT"));
             DocumentCollection allDocuments = lnc.getBugsDb().getAllDocuments();

@@ -8,8 +8,6 @@ import org.apache.log4j.BasicConfigurator;
 
 import java.util.*;
 
-import static com.dalet.lotus.Configuration.NOTES_PASSWORD;
-
 /**
  * User: Moisei Rabinovich
  * Date: 6/19/2014
@@ -36,12 +34,13 @@ public class DaletAddressBookLotusClient {
             "scrumux",
             "scrumweb",
             "scrumxchange"));
+    private static final java.lang.String NOTES_PASSWORD = "";
 
 
-    static Map<String, Set<String>> getGroupsForUsers(Set<String> groupNames, Set<String> userNames, String groupForUnknownUsers) throws NotesException {
+    public static Map<String, Set<String>> getGroupsForUsers(Set<String> groupNames, Set<String> userNames, String groupForUnknownUsers) throws NotesException {
         BasicConfigurator.configure();
-        LotusNotesClient lnc = new LotusNotesClient(NOTES_PASSWORD, true);
         Map<String, Set<String>> groupsForUsers = new HashMap<>();
+        LotusNotesClient lnc = new LotusNotesClient(true);
         try {
             DocumentCollection allDocuments = lnc.getDaletAddressBookDb().getAllDocuments();
             for (Document groupDoc = allDocuments.getFirstDocument(); null != groupDoc; groupDoc = allDocuments.getNextDocument()) {
