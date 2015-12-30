@@ -1,3 +1,35 @@
+-- production commits with issues for 2015
+
+select
+      commits.revision,
+      issues.type,
+      issues.reference,
+      fullversion,
+      year,
+      month,
+      author
+     commits.message
+from
+    version,
+    issues,
+    date_time dt,
+    commits
+where
+    version.revision = issues.revision
+and
+    dt.revision = version.revision
+and
+    (branch = 'builds' or branch = 'hotfix')
+and
+    year = 2015
+and
+    commits.revision = version.revision
+order by
+    fullversion,
+    revision
+
+------------------------------------------------------------------------------------------
+
 select count (1) cnt, min(revision) minrev, max(revision)  maxrev from commits
 ------------------------------------------------------------------------------------------
 
