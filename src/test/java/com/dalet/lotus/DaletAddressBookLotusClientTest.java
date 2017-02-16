@@ -21,11 +21,17 @@ public class DaletAddressBookLotusClientTest {
         Set<String> users = new HashSet<String>() {{
             add("ctaboch");
         }};
-        Set<String> groupNames = new HashSet<String>() {{
-            add("scrumux");
-        }};
-        groupNames = DaletAddressBookLotusClient.VALID_SCRUMS;
+//        Set<String> groupNames = new HashSet<String>() {{
+//            add("scrumux");
+//        }};
+        Set<String> groupNames = DaletAddressBookLotusClient.VALID_SCRUMS;
         Map<String, Set<String>> groupsForUsers = DaletAddressBookLotusClient.getGroupsForUsers(groupNames, users, "other");
         System.out.println(groupsForUsers);
+    }
+
+
+    @Test
+    public void testPrintUsers() throws Exception {
+        DaletAddressBookLotusClient.printUsers(System.out);
     }
 }

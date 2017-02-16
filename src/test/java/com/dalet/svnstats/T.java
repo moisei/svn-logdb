@@ -9,11 +9,10 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.LineNumberReader;
+import java.io.*;
 import java.util.*;
 
+import static com.dalet.lotus.Configuration.NOTES_PASSWORD;
 import static com.dalet.lotus.LotusNotesClient.getStringValue;
 
 /**
@@ -24,8 +23,6 @@ import static com.dalet.lotus.LotusNotesClient.getStringValue;
 @SuppressWarnings("StatementWithEmptyBody")
 @Ignore
 public class T {
-
-    private static final String NOTES_PASSWORD = "";
 
     @Before
     public void setup() {
@@ -207,5 +204,31 @@ public class T {
             return msg.substring("Status Changed to".length()).split(" ")[0];
         }
         return "UNKNOWN";
+    }
+
+    @Test
+    public void test3() throws Exception {
+        try (LotusNotesClient lnc = new LotusNotesClient(NOTES_PASSWORD, true)) {
+//            Document doc = LotusNotesClient.findOriginalDocumentByReference(lnc.getBugsDb(), "#65235 - TZ");
+//            System.out.println(LotusNotesClient.getStringValue(doc, "History", "DEFAULT"));
+            DocumentCollection allDocuments = lnc.getBugsDb().getAllDocuments();
+            Document doc = allDocuments.getLastDocument();
+            try (PrintWriter fw = new PrintWriter(new FileWriter("bugs-features.csv"))) {
+                for (int i = 0; i < 2000; doc = allDocuments.getPrevDocument()) {
+                    String bugReference = doc.getItemValueString("Reference");
+                    if (null != bugReference && !bugReference.isEmpty()) {
+                        ++i;
+                        String feature = doc.getItemValueString("Feature");
+                        String featureReference = "";
+                        if (!feature.isEmpty()) {
+                            String[] tokens = feature.split(" ");
+                            featureReference = tokens[0] + " - " + tokens[2];
+                        }
+                        System.out.println(bugReference);
+                        fw.println(bugReference + "\t" + featureReference + "\t" + feature);
+                    }
+                }
+            }
+        }
     }
 }

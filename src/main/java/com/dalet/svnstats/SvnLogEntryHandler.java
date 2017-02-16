@@ -96,7 +96,7 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
                 productVersion = "other";
             } else {
                 SVNLogEntryPath firstPath = svnLogEntry.getChangedPaths().entrySet().iterator().next().getValue();
-                if (firstPath.getPath().startsWith("/branches/builds")) {
+                if (firstPath.getPath().startsWith("/branches/builds/")) {
                     product = "Dalet";
                     type = "prod";
                     branch = "builds";
@@ -108,7 +108,13 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
                     branch = "tnt";
                     fullVersion = "other";
                     productVersion = "other";
-                } else if (firstPath.getPath().startsWith("/branches/hotfixes")) {
+                } else if (firstPath.getPath().startsWith("/branches/amberfin")) {
+                    product = "Amberfin";
+                    type = "prod";
+                    branch = "amberfin";
+                    fullVersion = "other";
+                    productVersion = "other";
+                } else if (firstPath.getPath().startsWith("/branches/hotfixes/")) {
                     product = "Dalet";
                     type = "prod";
                     branch = "hotfix";

@@ -50,6 +50,7 @@ public class Main {
             return Long.parseLong(args[index]);
         } catch (NumberFormatException e) {
             usage();
+            System.out.println("Wrong " + (index+1) + "-th argument " + args[index] + ". Expected number");
             throw e;
         }
     }

@@ -6,7 +6,10 @@ import lotus.domino.Item;
 import lotus.domino.NotesException;
 import org.apache.log4j.BasicConfigurator;
 
+import java.io.PrintStream;
 import java.util.*;
+
+import static com.dalet.lotus.Configuration.NOTES_PASSWORD;
 
 /**
  * User: Moisei Rabinovich
@@ -34,7 +37,6 @@ public class DaletAddressBookLotusClient {
             "scrumux",
             "scrumweb",
             "scrumxchange"));
-    private static final java.lang.String NOTES_PASSWORD = "";
 
 
     public static Map<String, Set<String>> getGroupsForUsers(Set<String> groupNames, Set<String> userNames, String groupForUnknownUsers) throws NotesException {
@@ -83,7 +85,7 @@ public class DaletAddressBookLotusClient {
         return (svnNameTokens[0].substring(0, 1) + svnNameTokens[1]).toLowerCase();
     }
 
-    private String nameToKey(String fullName) throws NotesException {
+    private static String nameToKey(String fullName) throws NotesException {
         String[] fullNameTokens = fullName.split("[=/]");
         if (1 == fullNameTokens.length) {
             return fullName.toLowerCase();
@@ -128,7 +130,7 @@ public class DaletAddressBookLotusClient {
         }
     }
 
-    public String getItemValueString(Document doc, String valueName) {
+    public static String getItemValueString(Document doc, String valueName) {
         try {
             if (null == doc) {
                 return null;
@@ -154,4 +156,48 @@ public class DaletAddressBookLotusClient {
     private static String toProperCase(String str) {
         return str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
     }
+
+    public static void printUsers(PrintStream out) throws NotesException {
+        BasicConfigurator.configure();
+        LotusNotesClient lnc = new LotusNotesClient(NOTES_PASSWORD, true);
+        try {
+            DocumentCollection allDocuments = lnc.getDaletAddressBookDb().getAllDocuments();
+            System.out.println(allDocuments.getCount());
+            HashMap<String, Document> users = new HashMap<>(allDocuments.getCount());
+            for (Document doc = allDocuments.getFirstDocument(); null != doc; doc = allDocuments.getNextDocument()) {
+                if ("Person".equals(doc.getItemValueString("Type"))) {
+                    users.put(nameToKey(doc.getItemValueString("FullName")), doc);
+                }
+            }
+            for (Document groupDoc = allDocuments.getFirstDocument(); null != groupDoc; groupDoc = allDocuments.getNextDocument()) {
+                if (!"Group".equals(groupDoc.getItemValueString("Type"))) {
+                    continue;
+                }
+                String groupName = groupDoc.getItemValueString("ListName");
+                if (!VALID_SCRUMS.contains(groupName.toLowerCase())) {
+                    continue;
+                }
+                @SuppressWarnings("unchecked") Vector<String> members = groupDoc.getItemValue("Members");
+                Collections.sort(members);
+                for (String user : members) {
+                    Document userDoc = users.get(nameToKey(user));
+                    if (null == userDoc) {
+//                        System.err.println("Can't find user: " + user + ": " + members);
+                        continue;
+                    }
+                    out.printf("%s\t%s\t%s\t%s\n",
+                            groupName,
+                            getItemValueString(userDoc, "InternetAddress").toLowerCase(),
+                            toCamelCase(getItemValueString(userDoc, "FirstName")),
+                            toCamelCase(getItemValueString(userDoc, "LastName"))
+                    );
+                }
+            }
+        } finally {
+            lnc.closeNotesSession();
+        }
+    }
+
+
+
 }
