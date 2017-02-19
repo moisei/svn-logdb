@@ -1,7 +1,6 @@
 /.svnlogDB*
 /Svn-Statistics.iml
 /.idea
-/src/com/dalet/lotus/Configuration.java
 /.gradle
 /gradlew
 /build

@@ -13,33 +13,52 @@ public class Main {
     private static final int DEFAULT_START_REVISION = 1;
     private static final long DEFAULT_END_REVISION = SVNRepository.INVALID_REVISION;
 
+   private enum Action {
+        updateorrebuild, update, forcerebuild;
+    }
+
     // svn://gfn-svn:3692 updateorbuild
     public static void main(String[] args) throws Exception {
         BasicConfigurator.configure();
-        String svnUrl = initArg(args, 0, null);
-        String action = initArg(args, 1, null);
+        if (args.length < 2) {
+            usage();
+            return;
+        }
+        String svnUrl = args[0];
+        Action action = initAction(args);
         long startRevision = initArg(args, 2, DEFAULT_START_REVISION);
         long endRevision = initArg(args, 3, DEFAULT_END_REVISION);
-        try (SvnlogDbIndexer logDbBuilder = new SvnlogDbIndexer(svnUrl)) {
-            switch (action.toLowerCase()) {
-                case "updateorrebuild": {
-                    logDbBuilder.updateOrRebuildIndex(startRevision, endRevision);
+        try (SvnlogDbIndexer svnlogDbIndexer = new SvnlogDbIndexer(svnUrl)) {
+            switch (action) {
+                case updateorrebuild: {
+                    svnlogDbIndexer.updateOrRebuildIndex(startRevision, endRevision);
                     break;
                 }
-                case "update": {
-                    logDbBuilder.updateIndex(endRevision);
+                case update: {
+                    svnlogDbIndexer.updateIndex(endRevision);
                     break;
                 }
-                case "forcerebuild": {
-                    logDbBuilder.forceRebuildIndex(startRevision, endRevision);
+                case forcerebuild: {
+                    svnlogDbIndexer.forceRebuildIndex(startRevision, endRevision);
                     break;
                 }
                 default: {
                     usage();
-                    throw new Exception("Unknown action " + action);
+                    throw new Exception("Unknown action " + action.toString());
                 }
             }
         }
+    }
+
+    private static Action initAction(String[] args) throws Exception {
+        Action action;
+        try {
+            action = Action.valueOf(args[1]);
+        } catch (IllegalArgumentException e) {
+            usage();
+            throw new Exception("Unknown action " + args[1]);
+        }
+        return action;
     }
 
     private static long initArg(String[] args, int index, long defaultValue) {
@@ -55,12 +74,8 @@ public class Main {
         }
     }
 
-    private static String initArg(String[] args, int index, String defaultValue) {
-        return args.length < (1 + index) ? defaultValue : args[index];
-    }
-
     private static void usage() {
-        System.out.println("java -jar dalet-svn-stats.jar <svn url> [action:updateOrRebuild|update|forceRebuild default updateorbuild] [<start revision> default 1] [<end revision> default HEAD]");
+        System.out.println("java -jar dalet-svn-stats.jar <svn url> <action:updateOrRebuild|update|forceRebuild> [<start revision> default 1] [<end revision> default HEAD]");
         System.out.println("Index svn repo history to SQL database");
     }
 }
