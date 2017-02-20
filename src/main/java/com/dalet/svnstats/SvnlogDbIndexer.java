@@ -89,6 +89,7 @@ public class SvnlogDbIndexer implements Closeable {
     }
 
     private void buildIndex(long startRevision, long endRevision) throws SVNException, SQLException, ClassNotFoundException, IOException, InstantiationException, IllegalAccessException {
+        System.out.println("buildIndex: from " + startRevision + " to " + endRevision);
         try (SvnLogEntryHandler svnLogEntryHandler = new SvnLogEntryHandler(sqlConnection)) {
             svnRepository.log(new String[]{"/"}, startRevision, endRevision, true, false, svnLogEntryHandler);
             sqlConnection.commit();
@@ -98,6 +99,7 @@ public class SvnlogDbIndexer implements Closeable {
     }
 
     public static void deleteIndex() throws IOException, InterruptedException {
+        System.out.println("delete index");
         Path dbParentFolder = dbFile.getParent();
         Runtime.getRuntime().exec(new String[]{"cmd", "/k", "rmdir", "/s", "/q", dbParentFolder.toString()});
         Thread.sleep(1000);
@@ -107,6 +109,7 @@ public class SvnlogDbIndexer implements Closeable {
     }
 
     public void updateIndex(long endRevision) throws SQLException, SVNException, ClassNotFoundException, InstantiationException, IllegalAccessException, IOException {
+        System.out.println("updateIndex: to " + endRevision);
         initHsqldb();
         long maxRevision = getMaxRevision();
         if (SVNRepository.INVALID_REVISION == maxRevision) {
@@ -118,7 +121,7 @@ public class SvnlogDbIndexer implements Closeable {
     public void updateOrRebuildIndex(long startRevision, long endRevision) throws SQLException, SVNException, ClassNotFoundException, InstantiationException, IllegalAccessException, IOException {
         initHsqldb();
         long maxRevision = getMaxRevision();
-        if (SVNRepository.INVALID_REVISION == maxRevision) {
+        if (SVNRepository.INVALID_REVISION == maxRevision || maxRevision < startRevision ) {
             buildIndex(startRevision, endRevision);
         } else {
             buildIndex(maxRevision + 1, endRevision);

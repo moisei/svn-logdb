@@ -14,7 +14,7 @@ public class Main {
     private static final long DEFAULT_END_REVISION = SVNRepository.INVALID_REVISION;
 
    private enum Action {
-        updateorrebuild, update, forcerebuild;
+        UPDATEORREBUILD, UPDATE, FORCEREBUILD
     }
 
     // svn://gfn-svn:3692 updateorbuild
@@ -28,17 +28,21 @@ public class Main {
         Action action = initAction(args);
         long startRevision = initArg(args, 2, DEFAULT_START_REVISION);
         long endRevision = initArg(args, 3, DEFAULT_END_REVISION);
+        System.out.println(svnUrl);
+        System.out.println(action);
+        System.out.println(startRevision);
+        System.out.println(endRevision);
         try (SvnlogDbIndexer svnlogDbIndexer = new SvnlogDbIndexer(svnUrl)) {
             switch (action) {
-                case updateorrebuild: {
+                case UPDATEORREBUILD: {
                     svnlogDbIndexer.updateOrRebuildIndex(startRevision, endRevision);
                     break;
                 }
-                case update: {
+                case UPDATE: {
                     svnlogDbIndexer.updateIndex(endRevision);
                     break;
                 }
-                case forcerebuild: {
+                case FORCEREBUILD: {
                     svnlogDbIndexer.forceRebuildIndex(startRevision, endRevision);
                     break;
                 }
@@ -53,7 +57,7 @@ public class Main {
     private static Action initAction(String[] args) throws Exception {
         Action action;
         try {
-            action = Action.valueOf(args[1]);
+            action = Action.valueOf(args[1].toUpperCase());
         } catch (IllegalArgumentException e) {
             usage();
             throw new Exception("Unknown action " + args[1]);
