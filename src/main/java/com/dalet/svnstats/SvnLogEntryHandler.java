@@ -174,7 +174,7 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
                 msg = "";
             } else if (msg.length() >= SvnlogDbIndexer.MAX_MSG_LENGTH) {
                 System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " message is too long: " + msg.length());
-                msg = msg.substring(0, SvnlogDbIndexer.MAX_MSG_LENGTH);
+                msg = "this log message was corrupted";
             } else {
                 // msg is OK
             }
