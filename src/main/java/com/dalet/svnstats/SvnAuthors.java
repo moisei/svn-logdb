@@ -119,9 +119,7 @@ public class SvnAuthors {
 
     public static String getTeam(String author) {
         author = author.toLowerCase();
-        if (null == AUTHORS_GROUP.get(author)) {
-            AUTHORS_GROUP.put(author, "other");
-        }
+        AUTHORS_GROUP.putIfAbsent(author, "other");
         return AUTHORS_GROUP.get(author);
     }
 }

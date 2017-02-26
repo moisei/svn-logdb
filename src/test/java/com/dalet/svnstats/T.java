@@ -10,6 +10,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.*;
+import java.nio.file.Paths;
 import java.util.*;
 
 import static com.dalet.lotus.Configuration.NOTES_PASSWORD;
@@ -83,9 +84,7 @@ public class T {
 //        System.out.println(firstLine + " --> " + errorLine);
 //        System.out.println(sb);
 //        System.out.println("==============================================================================\n");
-        if (null == errorLines.get(errorLine)) {
-            errorLines.put(errorLine, new ArrayList<String>(1000));
-        }
+        errorLines.computeIfAbsent(errorLine, k -> new ArrayList<>(1000));
         errorLines.get(errorLine).add(firstLine);
     }
 
@@ -94,6 +93,7 @@ public class T {
         String reference = "#69317 - LJ";
         try (LotusNotesClient lnc = new LotusNotesClient(NOTES_PASSWORD, true)) {
             Document doc = LotusNotesClient.findOriginalDocumentByReference(lnc.getBugsDb(), reference);
+            //noinspection ConstantConditions
             for (Object o : doc.getItems()) {
                 String valueName = o.toString();
                 try {
@@ -231,4 +231,13 @@ public class T {
             }
         }
     }
+
+
+    @Test
+    public void name() throws Exception {
+        System.out.println(Paths.get("\\\\jopa", "popa").toFile().toString());
+        System.out.println(Paths.get("popa").toString());
+    }
 }
+
+
