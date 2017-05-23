@@ -30,6 +30,7 @@ public class SvnlogDbIndexer implements Closeable {
     public static final int MAX_MSG_LENGTH = 1024 * 8;
     public static final int MAX_PATH_LENGTH = 2048;
     public static final Path dbFile = FileSystems.getDefault().getPath(".svnlogDB", "db");
+    public static final int MAX_MSG_ISSUES = 10;
 
     private SVNRepository svnRepository;
     private Connection sqlConnection;
@@ -62,6 +63,8 @@ public class SvnlogDbIndexer implements Closeable {
         updateIgnoreExisiting("CREATE UNIQUE INDEX  commits_revision ON commits (revision)");
         updateIgnoreExisiting("CREATE TABLE FILES(Revision BIGINT, Type VARCHAR(10), Kind VARCHAR(10), File VARCHAR(" + MAX_PATH_LENGTH + "))");
         updateIgnoreExisiting("CREATE UNIQUE INDEX  files_revision_file ON files (revision,file)");
+        updateIgnoreExisiting("CREATE UNIQUE INDEX  files_file_revision ON files (file, revision)");
+        updateIgnoreExisiting("CREATE INDEX  files_file ON files (file)");
         updateIgnoreExisiting("CREATE TABLE DATE_TIME(Revision BIGINT, Date DATE, Time TIME, DateTime DATETIME, Year INTEGER, Month INTEGER, Day INTEGER, Week INTEGER, DayOfWeek INTEGER, Hour INTEGER, Minutes INTEGER, Sec INTEGER)");
         updateIgnoreExisiting("CREATE UNIQUE INDEX  date_time_revision ON date_time (revision)");
         updateIgnoreExisiting("CREATE TABLE VERSION(Revision BIGINT, Product VARCHAR(32), Type VARCHAR(10), Branch VARCHAR(1024), ProductVersion VARCHAR(100), FullVersion VARCHAR(100))");
