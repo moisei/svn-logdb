@@ -6,10 +6,7 @@ import java.io.Closeable;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.GregorianCalendar;
-import java.util.Map;
+import java.util.*;
 
 import static com.dalet.lotus.LotusNotesIssueReferenceUtils.extractReferencedBugs;
 import static com.dalet.lotus.LotusNotesIssueReferenceUtils.extractReferencedFeatures;
@@ -25,32 +22,48 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
     private final InsertStatement insertDateTimeStatement;
     private final InsertStatement insertVersionStatement;
     private final InsertStatement insertIssuesStatement;
+    private DiffsGenerator diffsGenerator;
 
-    public SvnLogEntryHandler(Connection sqlConnection) throws SQLException {
-        insertCommitsStatement = new InsertStatement("COMMITS", sqlConnection);
-        insertFilesStatement = new InsertStatement("FILES", sqlConnection);
-        insertDateTimeStatement = new InsertStatement("DATE_TIME", sqlConnection);
-        insertVersionStatement = new InsertStatement("VERSION", sqlConnection);
-        insertIssuesStatement = new InsertStatement("ISSUES", sqlConnection);
+    public SvnLogEntryHandler(Connection sqlConnection, DiffsGenerator diffsGenerator) throws SQLException {
+        try {
+            insertCommitsStatement = new InsertStatement("COMMITS", sqlConnection);
+            insertFilesStatement = new InsertStatement("FILES", sqlConnection);
+            insertDateTimeStatement = new InsertStatement("DATE_TIME", sqlConnection);
+            insertVersionStatement = new InsertStatement("VERSION", sqlConnection);
+            insertIssuesStatement = new InsertStatement("ISSUES", sqlConnection);
+        } catch (SQLException e) {
+            close();
+            throw e;
+        }
+        this.diffsGenerator = diffsGenerator;
     }
 
     @Override
     public void close() {
-        insertCommitsStatement.close();
-        insertFilesStatement.close();
-        insertDateTimeStatement.close();
-        insertDateTimeStatement.close();
-        insertIssuesStatement.close();
+        closeStatement(insertCommitsStatement);
+        closeStatement(insertFilesStatement);
+        closeStatement(insertDateTimeStatement);
+        closeStatement(insertDateTimeStatement);
+        closeStatement(insertIssuesStatement);
+    }
+
+    private void closeStatement(InsertStatement statement) {
+        if (null != statement) {
+            try {
+                statement.close();
+            } catch (Exception ignore) {
+            }
+        }
     }
 
     @Override
     public void handleLogEntry(SVNLogEntry svnLogEntry) throws SVNException {
-        if (0 == (svnLogEntry.getRevision() % 100)) {
-            System.out.println("Handling revision: " + svnLogEntry.getRevision());
+        if (0 == (svnLogEntry.getRevision() % 1000)) {
+            System.out.print(String.format("\rHandling revision: %6d", svnLogEntry.getRevision()));
         }
         try {
             new SvnLogEntryHandlerHelper(svnLogEntry).handle();
-        } catch (SQLException e) {
+        } catch (Exception e) {
             throw new SVNException(SVNErrorMessage.create(SVNErrorCode.UNKNOWN, e.getMessage()), e);
         }
     }
@@ -62,12 +75,13 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
             this.svnLogEntry = svnLogEntry;
         }
 
-        private void handle() throws SQLException {
+        private void handle() throws Exception {
             fillCommits();
             fillChangedFiles();
             fillDateTime();
             fillVersion();
             fillIssues();
+            submitDiff();
         }
 
         // Revision BIGINT, Type VARCHAR(10), Reference VARCHAR(100), NotesClientUrl VARCHAR(1024), NotesWebUrl VARCHAR(1024))
@@ -95,31 +109,49 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
                 fullVersion = "other";
                 productVersion = "other";
             } else {
-                SVNLogEntryPath firstPath = svnLogEntry.getChangedPaths().entrySet().iterator().next().getValue();
-                if (firstPath.getPath().startsWith("/branches/builds/")) {
+                String firstPath = svnLogEntry.getChangedPaths().entrySet().iterator().next().getValue().getPath();
+                if (firstPath.startsWith("/branches/builds/")) {
                     product = "Dalet";
                     type = "prod";
                     branch = "builds";
-                    fullVersion = firstPath.getPath().split("/")[3];
-                    productVersion = productVersionByFullVersion(svnLogEntry, fullVersion);
-                } else if (firstPath.getPath().startsWith("/branches/tnt")) {
+                    fullVersion = firstPath.split("/")[3];
+                    productVersion = daletProductVersionByFullVersion(svnLogEntry, fullVersion);
+                } else if (firstPath.startsWith("/branches/hotfixes/")) {
+                    product = "Dalet";
+                    type = "prod";
+                    branch = "hotfix";
+                    fullVersion = firstPath.split("/")[3];
+                    productVersion = daletProductVersionByFullVersion(svnLogEntry, fullVersion);
+                } else if (firstPath.startsWith("/branches/tnt")) {
                     product = "Italy";
                     type = "prod";
                     branch = "tnt";
                     fullVersion = "other";
                     productVersion = "other";
-                } else if (firstPath.getPath().startsWith("/branches/amberfin")) {
+                } else if (firstPath.startsWith("/amberfin/products/amberfin/branches/amberfin_")) {
+                    product = "Amberfin";
+                    type = "prod";
+                    branch = "branches";
+                    fullVersion = firstPath.substring("/amberfin/products/amberfin/branches/amberfin_".length()).split("/")[0];
+                    productVersion = fullVersion.split("_")[0];
+                } else if (firstPath.startsWith("/amberfin/products/amberfin/trunk")) {
+                    product = "Amberfin";
+                    type = "other";
+                    branch = "trunk";
+                    fullVersion = "other";
+                    productVersion = "other";
+                } else if (firstPath.startsWith("/amberfin/products/amberfin/branches/amberfinkiosk_v")) {
+                    product = "AmberfinKiosk";
+                    type = "prod";
+                    branch = "branches";
+                    fullVersion = firstPath.substring("/amberfin/products/amberfin/branches/amberfinkiosk_v".length()).split("/")[0];
+                    productVersion = fullVersion.split("_")[0];
+                } else if (firstPath.startsWith("/amberfin")) {
                     product = "Amberfin";
                     type = "prod";
                     branch = "amberfin";
                     fullVersion = "other";
                     productVersion = "other";
-                } else if (firstPath.getPath().startsWith("/branches/hotfixes/")) {
-                    product = "Dalet";
-                    type = "prod";
-                    branch = "hotfix";
-                    fullVersion = firstPath.getPath().split("/")[3];
-                    productVersion = productVersionByFullVersion(svnLogEntry, fullVersion);
                 } else {
                     product = "other";
                     type = "other";
@@ -138,7 +170,7 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
             );
         }
 
-        private String productVersionByFullVersion(SVNLogEntry svnLogEntry, String fullVersion) {
+        private String daletProductVersionByFullVersion(SVNLogEntry svnLogEntry, String fullVersion) {
             String[] productVersionTokens = fullVersion.split("\\.");
             if (productVersionTokens.length > 1) {
                 return productVersionTokens[0] + "." + productVersionTokens[1];
@@ -171,7 +203,7 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
             String msg = svnLogEntry.getMessage();
             int cnt;
             if (msg == null) {
-                System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " MESSAGE IS NULL ");
+                // System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " MESSAGE IS NULL ");
                 msg = "";
             } else if (msg.length() >= SvnlogDbIndexer.MAX_MSG_LENGTH) {
                 System.out.println("*** Warning. revision: " + svnLogEntry.getRevision() + " message is too long: " + msg.length());
@@ -182,8 +214,8 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
             } else {
                 // msg is OK
             }
-            String team = SvnAuthors.getTeam(svnLogEntry.getAuthor());
-            insertCommitsStatement.addrow(svnLogEntry.getRevision(), new Date(svnLogEntry.getDate().getTime()), svnLogEntry.getAuthor(), team, svnLogEntry.getChangedPaths().size(), msg);
+            //updateIgnoreExisiting("CREATE TABLE COMMITS(Revision BIGINT, Date DATE, Author VARCHAR(100), Team VARCHAR(100), ChangedFilesCount INTEGER, DiffSize BIGINT, Message VARCHAR(" + MAX_MSG_LENGTH + "))");
+            insertCommitsStatement.addrow(svnLogEntry.getRevision(), new Date(svnLogEntry.getDate().getTime()), svnLogEntry.getAuthor(), "", "", svnLogEntry.getChangedPaths().size(), -1L, msg);
         }
 
         private int countIssues(String msg) {
@@ -197,6 +229,9 @@ class SvnLogEntryHandler implements ISVNLogEntryHandler, Closeable {
                 insertFilesStatement.addrow(svnLogEntry.getRevision(), String.valueOf(change.getType()), change.getKind().toString(), change.getPath());
             }
         }
-    }
 
+        private void submitDiff() throws Exception {
+            diffsGenerator.submitIfNeeded(svnLogEntry);
+        }
+    }
 }

@@ -13,8 +13,8 @@ public class Main {
     private static final int DEFAULT_START_REVISION = 1;
     private static final long DEFAULT_END_REVISION = SVNRepository.INVALID_REVISION;
 
-   private enum Action {
-        UPDATEORREBUILD, UPDATE, FORCEREBUILD
+    private enum Action {
+        UPDATEORREBUILD, UPDATE, FORCEREBUILD, UPDATEDIFFS
     }
 
     // svn://gfn-svn:3692 updateorbuild
@@ -28,10 +28,10 @@ public class Main {
         Action action = initAction(args);
         long startRevision = initArg(args, 2, DEFAULT_START_REVISION);
         long endRevision = initArg(args, 3, DEFAULT_END_REVISION);
-        System.out.println(svnUrl);
-        System.out.println(action);
-        System.out.println(startRevision);
-        System.out.println(endRevision);
+        System.out.println("URL: " + svnUrl);
+        System.out.println("ACT: " + action);
+        System.out.println("STA: " + startRevision);
+        System.out.println("END: " + endRevision);
         try (SvnlogDbIndexer svnlogDbIndexer = new SvnlogDbIndexer(svnUrl)) {
             switch (action) {
                 case UPDATEORREBUILD: {
@@ -46,11 +46,19 @@ public class Main {
                     svnlogDbIndexer.forceRebuildIndex(startRevision, endRevision);
                     break;
                 }
+                case UPDATEDIFFS: {
+                    svnlogDbIndexer.updateDiffs(startRevision, endRevision);
+                    break;
+                }
                 default: {
                     usage();
                     throw new Exception("Unknown action " + action.toString());
                 }
             }
+        }
+
+        try (SvnlogDbIndexer svnlogDbIndexer = new SvnlogDbIndexer(svnUrl)) {
+            svnlogDbIndexer.checkpoint();
         }
     }
 
@@ -73,13 +81,13 @@ public class Main {
             return Long.parseLong(args[index]);
         } catch (NumberFormatException e) {
             usage();
-            System.out.println("Wrong " + (index+1) + "-th argument " + args[index] + ". Expected number");
+            System.out.println("Wrong " + (index + 1) + "-th argument " + args[index] + ". Expected number");
             throw e;
         }
     }
 
     private static void usage() {
-        System.out.println("java -jar dalet-svn-stats.jar <svn url> <action:updateOrRebuild|update|forceRebuild> [<start revision> default 1] [<end revision> default HEAD]");
+        System.out.println("java -jar dalet-svn-stats.jar <svn url> <action:updateOrRebuild|update|forceRebuild|updateDiffs> [<start revision> default 1] [<end revision> default HEAD]");
         System.out.println("Index svn repo history to SQL database");
     }
 }
